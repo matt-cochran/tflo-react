@@ -60,6 +60,25 @@ usePattern("frustrated_session", (p) =>
 identical to your `tflo` Rust backend — author a funnel/abuse/SLA pattern once,
 run it client-side for instant UX and server-side for trust.
 
+**Patterns as data — server-pushable (`@tflo/react/cel`).** Predicates can be
+**CEL strings**, not JS closures — so a pattern is a serializable object,
+evaluated by the same `cel-interpreter` that runs in the Rust backend. Author it
+once, store it, **push it from a server at runtime**, and get byte-identical
+*predicate* parity across tiers:
+
+```ts
+import { compileCelPattern, CelRuntime, initTfloCel } from "@tflo/react/cel";
+await initTfloCel();
+const spec = { name: "abandoned", when: 'kind == "add_to_cart"',
+               notThen: 'kind == "purchase"', within: 300000 }; // ← pure data
+const rt = new CelRuntime(compileCelPattern(spec, (e) => e.ts,
+  (m) => ({ name: "abandoned", payload: { cartId: m.first().cartId } })));
+```
+
+> Opt-in and **heavy** (~2 MB — it bundles a CEL interpreter). The default
+> `@tflo/react` stays lean (~40 KB) with JS-closure predicates; reach for `/cel`
+> only when you need predicates as serializable/server-pushable data.
+
 **Deterministic replay.** `useRecorder()` records the event stream; `replay()`
 re-derives the exact same signals (the engine is deterministic) — temporal
 time-travel debugging.
@@ -224,9 +243,12 @@ npm --prefix validation run all   # RxJS vs XState vs tflo, side by side
   and **`MatchContext`** (in the engine) for cross-step *value* correlation:
   `then`/`notThen` predicates receive a 2nd argument with the events captured so
   far, so `(e, ctx) => e.id === ctx.first()?.id` works in a single runtime.
-- **Roadmap (the deeper moat):** CEL predicates (for full cross-tier *predicate*
-  parity + server-pushed patterns), a devtools panel (partial-match inspection),
-  and broader `tflo-ops` surface. See `docs/superpowers/specs`.
+- **CEL predicates (shipped, opt-in):** `@tflo/react/cel` — serializable,
+  server-pushable predicates with cross-tier *predicate* parity (~2 MB; v1 is
+  event-field predicates, no cross-step CEL context yet).
+- **Roadmap:** cross-step CEL context (CEL predicates that reference earlier
+  captures, for full CEL parity with the JS `MatchContext`), and a broader
+  `tflo-ops` hook surface. See `docs/superpowers/specs`.
 
 ## License
 
