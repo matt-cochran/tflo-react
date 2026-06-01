@@ -1,22 +1,36 @@
 /**
  * `TypedPattern` — a strict, generic facade over the soft runtime `Pattern`.
  *
- * Same fluent shape as `Pattern`, but:
- *  - `.when/.then/.notThen` predicates receive the discriminated event union `E`
- *    (so `e.kind === "..."` narrows the event's fields);
- *  - `.then/.notThen` also receive a typed `MatchContext<E>`;
- *  - `.emit(fn)` takes a closure returning ONLY the payload, which must satisfy
- *    `S[K]` (the payload type for this pattern's signal name `K`). The wrapper
- *    injects `{ name, ts, payload }` so the user never hand-builds the envelope.
+ * Same fluent shape as `Pattern`, but with PER-STEP type tracking. The chain
+ * accumulates a tuple `Steps extends readonly unknown[]`: each `.when/.then/
+ * .whenSignal/...` appends the element type it captures. That tuple then drives:
+ *
+ *  - the `MatchContext` handed to a `.then/.notThen/.thenSignal` predicate, so
+ *    `ctx.first()` is the FIRST step's type and `ctx.last()`/`ctx.all()` reflect
+ *    the steps captured BEFORE the current one;
+ *  - the `Match` handed to `.emit`, so `m.first()` is step 0's type, `m.last()`
+ *    is the FINAL step's type, `m.all()` is a typed array of the step union, and
+ *    `m.at(name)` is the step union.
+ *
+ * Event-step narrowing leans on TypeScript 5.5+ inferred type predicates: a bare
+ * `e => e.kind === "connection_failed"` is inferred as a type guard, so `.when`'s
+ * guard overload captures the narrowed variant (`connection_failed`) as that
+ * step's element. A predicate the compiler cannot prove is a guard (e.g.
+ * `e => e.ts > 0` or `e.kind === "x" && other`) resolves to the boolean overload,
+ * which appends the full `E` union for that step — a safe, lossless fallback.
+ *
+ * Signal steps (`whenSignal/thenSignal/notThenSignal`) append `SignalEvent<S, N>`
+ * so `m.first()` etc. see the typed re-entered signal (`payload` is `S[N]`).
+ *
+ * `.emit(fn)` takes a closure returning ONLY the payload, which must satisfy
+ * `S[K]` (the payload type for this pattern's signal name `K`). The wrapper
+ * injects `{ name, ts, payload }`. The step-tuple flows into `fn`'s `Match`, so
+ * `m` is INFERRED — no hand annotation.
  *
  * The engine stays soft: every closure is cast at the boundary
  * (`(e: unknown) => pred(e as E)`). No WASM/runtime change.
- *
- * The type parameter `K` carries the signal name so `.emit`'s payload is pinned
- * to `S[K]`. The factory (`createTflo`) supplies `K` from the `usePattern(name)`
- * literal; standalone construction defaults `K` to `keyof S`.
  */
-import { Pattern, type CompiledPattern, type Match, type MatchContext } from "../core/pattern";
+import { Pattern, type CompiledPattern } from "../core/pattern";
 import type { TfloEvent, SignalMap } from "./types";
 
 /** The payload type a `.emit` closure must return for signal `K` in map `S`. */
@@ -35,30 +49,58 @@ export interface SignalEvent<S extends SignalMap, N extends keyof S> {
   payload: S[N];
 }
 
+/** The last element of a step tuple (or its union, for an unknown-length tuple). */
+type Last<Steps extends readonly unknown[]> = Steps extends readonly [...unknown[], infer L]
+  ? L
+  : Steps[number];
+
 /**
- * `TypedPattern<E, S, K, Captured>`:
- *  - `E`        — the discriminated user-event union (`.when/.then/...`);
- *  - `S`        — the `{ signalName: payload }` map;
- *  - `K`        — this pattern's OWN signal name (pins `.emit`'s payload to `S[K]`);
- *  - `Captured` — the union of event shapes the `.emit` `Match` can observe. Starts
- *                 at `E`; each `whenSignal/thenSignal(name)` widens it with the
- *                 corresponding `SignalEvent` so `m.first()/.last()/.all()/.at()`
- *                 see the typed re-entered signal (with `name: N` + `payload: S[N]`).
- *
- * TRADEOFF (Match typing): `Captured` is the *union* of every step's shape, not a
- * per-position tuple. So `m.first()` is typed as `Captured` (a union), and reading
- * `payload` requires narrowing on `kind`/`name` (`if (e.kind === "signal" && e.name === "rage") e.payload`).
- * This is the same ergonomic as the existing event steps (where `m.first()` is the
- * `E` union and you narrow on `kind`). The NON-NEGOTIABLE win — `name` checked
- * against `keyof S`, autocompleted, typo-safe — is fully delivered; the captured
- * signal payload is reachable via that narrow. Full heterogeneous per-step tuple
- * typing of `Match` was judged too costly for the value and is intentionally not done.
+ * Per-step `Match` (what `.emit` receives). `Steps` is the accumulated tuple of
+ * captured step types; `first()` is `Steps[0]`, `last()` is the final step, and
+ * `all()`/`at()` are the union of all steps. An empty chain degrades gracefully
+ * (`Steps[0]`/`Last<[]>` are `undefined`/`never`-ish), but a real pattern always
+ * has at least one step.
+ */
+export interface TypedMatch<Steps extends readonly unknown[]> {
+  readonly patternName: string;
+  readonly length: number;
+  first(): Steps[0];
+  last(): Last<Steps>;
+  all(): Steps[number][];
+  at(stepName: string): Steps[number] | undefined;
+}
+
+/**
+ * Per-step `MatchContext` (what a `.then/.notThen/.thenSignal` predicate
+ * receives). `Steps` here is the tuple of steps captured BEFORE the current one,
+ * so `ctx.first()` is the first step's type and `ctx.last()` is the immediately
+ * preceding step. All accessors are `| undefined` (a partial match may not yet
+ * have reached a given step).
+ */
+export interface TypedMatchContext<Steps extends readonly unknown[]> {
+  readonly length: number;
+  first(): Steps[0] | undefined;
+  last(): Last<Steps> | undefined;
+  all(): Steps[number][];
+  at(stepName: string): Steps[number] | undefined;
+}
+
+/**
+ * `TypedPattern<E, S, K, Steps>`:
+ *  - `E`     — the discriminated user-event union (`.when/.then/...`);
+ *  - `S`     — the `{ signalName: payload }` map;
+ *  - `K`     — this pattern's OWN signal name (pins `.emit`'s payload to `S[K]`);
+ *  - `Steps` — the accumulated TUPLE of captured step types. Each step method
+ *              appends its element: event steps append the narrowed variant (or
+ *              `E` when the predicate isn't a provable guard); signal steps
+ *              append `SignalEvent<S, N>`. Drives the per-step `Match`/
+ *              `MatchContext` typing described above.
  */
 export class TypedPattern<
   E extends TfloEvent,
   S extends SignalMap,
   K extends keyof S = keyof S,
-  Captured = E,
+  Steps extends readonly unknown[] = [],
 > {
   /**
    * @param inner the underlying soft `Pattern`
@@ -76,29 +118,81 @@ export class TypedPattern<
     return this;
   }
 
-  when(pred: (e: E) => boolean): this {
+  // ── Event steps. Two overloads each: a type-guard form that captures the
+  //    narrowed variant `T` (via TS 5.5+ inferred predicates), and a boolean
+  //    fallback that appends the full `E` union. ───────────────────────────────
+
+  when<T extends E>(pred: (e: E) => e is T): TypedPattern<E, S, K, [...Steps, T]>;
+  when(pred: (e: E) => boolean): TypedPattern<E, S, K, [...Steps, E]>;
+  when(pred: (e: E) => boolean): TypedPattern<E, S, K, readonly unknown[]> {
     this.inner = this.inner.when((e) => pred(e as E));
-    return this;
+    return this as unknown as TypedPattern<E, S, K, readonly unknown[]>;
   }
 
-  then(pred: (e: E, ctx: MatchContext<E>) => boolean): this {
-    this.inner = this.inner.then((e, c) => pred(e as E, c as MatchContext<E>));
-    return this;
+  then<T extends E>(
+    pred: (e: E, ctx: TypedMatchContext<Steps>) => e is T,
+  ): TypedPattern<E, S, K, [...Steps, T]>;
+  then(
+    pred: (e: E, ctx: TypedMatchContext<Steps>) => boolean,
+  ): TypedPattern<E, S, K, [...Steps, E]>;
+  then(
+    pred: (e: E, ctx: TypedMatchContext<Steps>) => boolean,
+  ): TypedPattern<E, S, K, readonly unknown[]> {
+    this.inner = this.inner.then((e, c) =>
+      pred(e as E, c as unknown as TypedMatchContext<Steps>),
+    );
+    return this as unknown as TypedPattern<E, S, K, readonly unknown[]>;
   }
 
-  thenNamed(stepName: string, pred: (e: E, ctx: MatchContext<E>) => boolean): this {
-    this.inner = this.inner.thenNamed(stepName, (e, c) => pred(e as E, c as MatchContext<E>));
-    return this;
+  thenNamed<T extends E>(
+    stepName: string,
+    pred: (e: E, ctx: TypedMatchContext<Steps>) => e is T,
+  ): TypedPattern<E, S, K, [...Steps, T]>;
+  thenNamed(
+    stepName: string,
+    pred: (e: E, ctx: TypedMatchContext<Steps>) => boolean,
+  ): TypedPattern<E, S, K, [...Steps, E]>;
+  thenNamed(
+    stepName: string,
+    pred: (e: E, ctx: TypedMatchContext<Steps>) => boolean,
+  ): TypedPattern<E, S, K, readonly unknown[]> {
+    this.inner = this.inner.thenNamed(stepName, (e, c) =>
+      pred(e as E, c as unknown as TypedMatchContext<Steps>),
+    );
+    return this as unknown as TypedPattern<E, S, K, readonly unknown[]>;
   }
 
-  notThen(pred: (e: E, ctx: MatchContext<E>) => boolean): this {
-    this.inner = this.inner.notThen((e, c) => pred(e as E, c as MatchContext<E>));
-    return this;
+  notThen<T extends E>(
+    pred: (e: E, ctx: TypedMatchContext<Steps>) => e is T,
+  ): TypedPattern<E, S, K, [...Steps, T]>;
+  notThen(
+    pred: (e: E, ctx: TypedMatchContext<Steps>) => boolean,
+  ): TypedPattern<E, S, K, [...Steps, E]>;
+  notThen(
+    pred: (e: E, ctx: TypedMatchContext<Steps>) => boolean,
+  ): TypedPattern<E, S, K, readonly unknown[]> {
+    this.inner = this.inner.notThen((e, c) =>
+      pred(e as E, c as unknown as TypedMatchContext<Steps>),
+    );
+    return this as unknown as TypedPattern<E, S, K, readonly unknown[]>;
   }
 
-  notThenNamed(stepName: string, pred: (e: E, ctx: MatchContext<E>) => boolean): this {
-    this.inner = this.inner.notThenNamed(stepName, (e, c) => pred(e as E, c as MatchContext<E>));
-    return this;
+  notThenNamed<T extends E>(
+    stepName: string,
+    pred: (e: E, ctx: TypedMatchContext<Steps>) => e is T,
+  ): TypedPattern<E, S, K, [...Steps, T]>;
+  notThenNamed(
+    stepName: string,
+    pred: (e: E, ctx: TypedMatchContext<Steps>) => boolean,
+  ): TypedPattern<E, S, K, [...Steps, E]>;
+  notThenNamed(
+    stepName: string,
+    pred: (e: E, ctx: TypedMatchContext<Steps>) => boolean,
+  ): TypedPattern<E, S, K, readonly unknown[]> {
+    this.inner = this.inner.notThenNamed(stepName, (e, c) =>
+      pred(e as E, c as unknown as TypedMatchContext<Steps>),
+    );
+    return this as unknown as TypedPattern<E, S, K, readonly unknown[]>;
   }
 
   within(ms: number): this {
@@ -106,52 +200,56 @@ export class TypedPattern<
     return this;
   }
 
+  // ── Signal steps. Each appends `SignalEvent<S, N>` to the step tuple, so the
+  //    `.emit` Match sees the re-entered signal with `name: N` + `payload: S[N]`.
+
   /**
    * Initial step matching a re-entered signal named `name` (the
    * `{ kind:"signal", name, ts, payload }` feedback contract). `name` is checked
    * against `keyof S` (typo-safe + autocomplete); the captured signal is added to
-   * the `.emit` `Match` as `SignalEvent<S, N>` (so its `payload` is `S[N]`).
+   * the step tuple as `SignalEvent<S, N>` (so its `payload` is `S[N]`).
    */
   whenSignal<N extends keyof S & string>(
     name: N,
-  ): TypedPattern<E, S, K, Captured | SignalEvent<S, N>> {
+  ): TypedPattern<E, S, K, [...Steps, SignalEvent<S, N>]> {
     this.inner = this.inner.when(
       (e) => (e as { kind?: unknown }).kind === "signal" && (e as { name?: unknown }).name === name,
     );
-    return this as unknown as TypedPattern<E, S, K, Captured | SignalEvent<S, N>>;
+    return this as unknown as TypedPattern<E, S, K, [...Steps, SignalEvent<S, N>]>;
   }
 
   /** Sequence step: a re-entered signal named `name` (see `whenSignal`). */
   thenSignal<N extends keyof S & string>(
     name: N,
-  ): TypedPattern<E, S, K, Captured | SignalEvent<S, N>> {
+  ): TypedPattern<E, S, K, [...Steps, SignalEvent<S, N>]> {
     this.inner = this.inner.then(
       (e) => (e as { kind?: unknown }).kind === "signal" && (e as { name?: unknown }).name === name,
     );
-    return this as unknown as TypedPattern<E, S, K, Captured | SignalEvent<S, N>>;
+    return this as unknown as TypedPattern<E, S, K, [...Steps, SignalEvent<S, N>]>;
   }
 
   /** Negative step: NO re-entered signal named `name` before the window closes. */
   notThenSignal<N extends keyof S & string>(
     name: N,
-  ): TypedPattern<E, S, K, Captured | SignalEvent<S, N>> {
+  ): TypedPattern<E, S, K, [...Steps, SignalEvent<S, N>]> {
     this.inner = this.inner.notThen(
       (e) => (e as { kind?: unknown }).kind === "signal" && (e as { name?: unknown }).name === name,
     );
-    return this as unknown as TypedPattern<E, S, K, Captured | SignalEvent<S, N>>;
+    return this as unknown as TypedPattern<E, S, K, [...Steps, SignalEvent<S, N>]>;
   }
 
   /**
    * Finalize. `fn` returns ONLY the payload, which must satisfy `S[K]`; the
-   * wrapper injects `{ name, ts, payload }`. The `Match` sees `Captured` — the
-   * user-event union widened by any signal steps. Returns the soft
+   * wrapper injects `{ name, ts, payload }`. The `Match` is INFERRED from the
+   * accumulated step tuple: `m.first()` is step 0, `m.last()` is the final step,
+   * `m.all()`/`m.at()` are the step union — no hand annotation. Returns the soft
    * `CompiledPattern` (the runtime handle) — `createTflo` re-types the hook's
    * output as `TypedSignal<S[K]>`.
    */
-  emit(fn: (m: Match<Captured>) => PayloadFor<S, K>): CompiledPattern<E> {
+  emit(fn: (m: TypedMatch<Steps>) => PayloadFor<S, K>): CompiledPattern<E> {
     const name = this.name;
     return this.inner.emit((m) => {
-      const match = m as unknown as Match<Captured>;
+      const match = m as unknown as TypedMatch<Steps>;
       return {
         name,
         ts: (match.last() as { ts: number }).ts,
