@@ -36,6 +36,9 @@ export {
   type TumblingWindowResult,
 } from "./core/ops";
 
+// CEL rules-as-data (server-pushable behavior; cross-tier parity stepping stone)
+export { useCelRules } from "./hooks/useCelRules";
+
 // Shipped ergonomic hooks
 export { useDebounced } from "./temporal/useDebounced";
 export { useThrottled } from "./temporal/useThrottled";
