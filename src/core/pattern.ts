@@ -21,6 +21,19 @@ export interface Match<E> {
   at(stepName: string): E | undefined;
 }
 
+/**
+ * What a `then`/`notThen` predicate receives as its 2nd argument — the events
+ * captured so far in the current partial match. Enables cross-step correlation
+ * (e.g. `(e, ctx) => e.id === ctx.first()?.id`).
+ */
+export interface MatchContext<E> {
+  readonly length: number;
+  first(): E | undefined;
+  last(): E | undefined;
+  all(): E[];
+  at(stepName: string): E | undefined;
+}
+
 export type EmitOutput = {
   name?: string;
   ts?: number;
@@ -51,20 +64,28 @@ export class Pattern<E extends { ts: number } = { ts: number }> {
     this.inner = this.inner.when((e: unknown) => pred(e as E));
     return this;
   }
-  then(pred: (e: E) => boolean): this {
-    this.inner = this.inner.then((e: unknown) => pred(e as E));
+  then(pred: (e: E, ctx: MatchContext<E>) => boolean): this {
+    this.inner = this.inner.then((e: unknown, ctx: unknown) =>
+      pred(e as E, ctx as MatchContext<E>),
+    );
     return this;
   }
-  thenNamed(name: string, pred: (e: E) => boolean): this {
-    this.inner = this.inner.thenNamed(name, (e: unknown) => pred(e as E));
+  thenNamed(name: string, pred: (e: E, ctx: MatchContext<E>) => boolean): this {
+    this.inner = this.inner.thenNamed(name, (e: unknown, ctx: unknown) =>
+      pred(e as E, ctx as MatchContext<E>),
+    );
     return this;
   }
-  notThen(pred: (e: E) => boolean): this {
-    this.inner = this.inner.notThen((e: unknown) => pred(e as E));
+  notThen(pred: (e: E, ctx: MatchContext<E>) => boolean): this {
+    this.inner = this.inner.notThen((e: unknown, ctx: unknown) =>
+      pred(e as E, ctx as MatchContext<E>),
+    );
     return this;
   }
-  notThenNamed(name: string, pred: (e: E) => boolean): this {
-    this.inner = this.inner.notThenNamed(name, (e: unknown) => pred(e as E));
+  notThenNamed(name: string, pred: (e: E, ctx: MatchContext<E>) => boolean): this {
+    this.inner = this.inner.notThenNamed(name, (e: unknown, ctx: unknown) =>
+      pred(e as E, ctx as MatchContext<E>),
+    );
     return this;
   }
   within(ms: number): this {

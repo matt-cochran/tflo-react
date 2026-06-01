@@ -22,6 +22,7 @@ export {
   CompiledPattern,
   PatternRuntime,
   type Match,
+  type MatchContext,
   type EmitOutput,
   type DerivedSignal,
 } from "./core/pattern";

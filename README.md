@@ -181,7 +181,8 @@ usePattern("abandoned", abandoned, [], { partitionBy: (e) => e.flowId });
 `useAsyncGuard`.
 
 **Pattern builder:** `Pattern` (`.timestamp/.when/.then/.notThen/.within/.emit`),
-`CompiledPattern`, `PatternRuntime`.
+`CompiledPattern`, `PatternRuntime`. `then`/`notThen` predicates may take a
+second `MatchContext` arg (`(e, ctx) => …`) for cross-step correlation.
 
 **Engine facades:** `windowJoinKeyed`, `tumblingWindow`, and the
 `indicators` namespace (`sma`, `ema`, `rsi`, `bollinger`, `macd`, `cross`,
@@ -218,11 +219,11 @@ npm --prefix validation run all   # RxJS vs XState vs tflo, side by side
   primitives + every building block + all 5 hooks + composition + StrictMode
   no-leak + replay determinism). `tsc` clean. The three `validation/*/tflo.mjs`
   demos pass.
-- **CEP correlation:** the engine's CEP layer (v0.1) has no cross-step field
-  correlation. Per-entity isolation is solved at the binding layer with
-  `partitionBy` (one runtime per key, automatically). Cross-step *value*
-  correlation (`B.value > A.value`) needs `MatchContext` in the engine — see
-  roadmap.
+- **CEP correlation (closed):** two complementary mechanisms — `partitionBy`
+  (one isolated runtime per key, at the binding layer) for per-entity tracking,
+  and **`MatchContext`** (in the engine) for cross-step *value* correlation:
+  `then`/`notThen` predicates receive a 2nd argument with the events captured so
+  far, so `(e, ctx) => e.id === ctx.first()?.id` works in a single runtime.
 - **Roadmap (the deeper moat):** CEL predicates (for full cross-tier *predicate*
   parity + server-pushed patterns), a devtools panel (partial-match inspection),
   and broader `tflo-ops` surface. See `docs/superpowers/specs`.
