@@ -30,7 +30,7 @@
   "comment:files": "The `validation/` directory (RxJS/XState reproduction suite proving the claims) is intentionally NOT in this allowlist, so it is never shipped in the published npm package. It lives in the GitHub repo as CI-run evidence only.",
   "scripts": {
     "build:wasm": "bash scripts/build-wasm.sh",
-    "build:ts": "tsc -p tsconfig.json && cp -r src/wasm dist/wasm",
+    "build:ts": "tsc -p tsconfig.json && rm -rf dist/wasm && cp -r src/wasm dist/wasm",
     "build": "npm run build:wasm && npm run build:ts",
     "test": "vitest run",
     "test:watch": "vitest",
