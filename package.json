@@ -1,0 +1,69 @@
+{
+  "name": "@tflo/react",
+  "version": "0.0.0",
+  "description": "Temporal state for React — event-time complex-event-processing (the tflo WASM engine) surfaced as hooks. The missing primitive for time and event sequences.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "wasm",
+    "README.md",
+    "LICENSE-MIT",
+    "LICENSE-APACHE"
+  ],
+  "comment:files": "The `validation/` directory (RxJS/XState reproduction suite proving the claims) is intentionally NOT in this allowlist, so it is never shipped in the published npm package. It lives in the GitHub repo as CI-run evidence only.",
+  "scripts": {
+    "build:wasm": "bash scripts/build-wasm.sh",
+    "build:ts": "tsc -p tsconfig.json",
+    "build": "npm run build:wasm && npm run build:ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit -p tsconfig.json",
+    "validate": "npm --prefix validation run all"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.4.0",
+    "@testing-library/react": "^16.0.0",
+    "@types/node": "^20.19.41",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "jsdom": "^24.0.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0"
+  },
+  "keywords": [
+    "react",
+    "temporal",
+    "cep",
+    "event-processing",
+    "event-time",
+    "wasm",
+    "rust",
+    "tflo",
+    "hooks",
+    "streaming"
+  ],
+  "author": "Matt Cochran",
+  "license": "(MIT OR Apache-2.0)",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/matt-cochran/tflo-react"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

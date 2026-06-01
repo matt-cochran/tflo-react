@@ -1,0 +1,24 @@
+{
+  "name": "tflo-react-validation",
+  "private": true,
+  "type": "module",
+  "description": "Reproduction suite proving the claims in the main README. NOT part of the published @tflo/react package. Run as CI evidence: can the incumbent JS libraries (RxJS, XState) express event-time CEP without hand-building an engine?",
+  "scripts": {
+    "s1:rxjs:naive": "node scenario-1-abandoned-flow/rxjs-naive.mjs",
+    "s1:rxjs": "node scenario-1-abandoned-flow/rxjs-eventtime.mjs",
+    "s1:xstate": "node scenario-1-abandoned-flow/xstate.mjs",
+    "s1:tflo": "node scenario-1-abandoned-flow/tflo.mjs",
+    "s2:rxjs": "node scenario-2-temporal-join/rxjs.mjs",
+    "s2:xstate": "node scenario-2-temporal-join/xstate.mjs",
+    "s2:tflo": "node scenario-2-temporal-join/tflo.mjs",
+    "s3:rxjs": "node scenario-3-out-of-order-windows/rxjs.mjs",
+    "s3:xstate": "node scenario-3-out-of-order-windows/xstate.mjs",
+    "s3:tflo": "node scenario-3-out-of-order-windows/tflo.mjs",
+    "all": "for s in s1:rxjs:naive s1:rxjs s1:xstate s1:tflo s2:rxjs s2:xstate s2:tflo s3:rxjs s3:xstate s3:tflo; do echo \"### $s\"; npm run -s $s; echo; done",
+    "tflo": "for s in s1:tflo s2:tflo s3:tflo; do echo \"### $s\"; npm run -s $s; echo; done"
+  },
+  "devDependencies": {
+    "rxjs": "^7.8.2",
+    "xstate": "^5.32.0"
+  }
+}
