@@ -52,3 +52,10 @@ export * as indicators from "./core/indicators";
 
 // WASM init (advanced; the provider calls this for you)
 export { initTflo } from "./core/wasmInit";
+
+// ── Typed public API (RECOMMENDED) ──────────────────────────────────────────
+// `createTflo<E, S>()` returns fully-typed, bound hooks over the soft engine.
+// The untyped hooks above remain the dynamic / CEL escape hatch.
+export { createTflo, type TfloApi, type TypedUsePatternOpts } from "./typed/createTflo";
+export { TypedPattern, type PayloadFor } from "./typed/pattern";
+export type { TfloEvent, SignalMap, TypedSignal } from "./typed/types";
