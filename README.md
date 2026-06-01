@@ -14,6 +14,7 @@ engine that runs server-side), surfaced as hooks.
 - [Why this exists (validated)](#why-this-exists-validated)
 - [The wow: things nothing else does](#the-wow-things-nothing-else-does)
 - [Quickstart](#quickstart)
+- [Typed API (recommended)](#typed-api-recommended)
 - [When to reach for tflo (and when not)](#when-to-reach-for-tflo-and-when-not)
 - [Composability: primitives & building blocks](#composability-primitives--building-blocks)
 - […and the boring stuff (timer utils)](#and-the-boring-stuff-timer-utils)
@@ -123,6 +124,85 @@ function Cart() {
 engine once. `useSignal("abandoned_cart")` is a decoupled consumer elsewhere in
 the tree.
 
+The hooks above are the **dynamic / escape-hatch** surface: events and signal
+payloads are `unknown`-typed, which is what you want for CEL rules-as-data or
+when the schema is only known at runtime. For application code, prefer the
+**typed API** below.
+
+## Typed API (recommended)
+
+`createTflo<Events, Signals>()` gives you the **same hooks, fully type-safe**.
+You declare your event union (`Events`, discriminated on `kind`) and your
+signal→payload map (`Signals`) once; every hook is then bound to that schema.
+The WASM engine stays "soft" internally — `createTflo` is a strict typed facade
+that casts at the boundary, so there is no runtime cost and no engine change.
+
+```tsx
+import { createTflo, type TfloEvent } from "@tflo/react";
+
+// 1. Declare your schema once (module scope).
+type Events =
+  | { kind: "add_to_cart"; ts: number; cartId: string; sku: string }
+  | { kind: "purchase"; ts: number; cartId: string };
+
+type Signals = {
+  abandoned_cart: { cartId: string };
+  rage: { count: number };
+};
+
+// 2. Build the typed API.
+export const t = createTflo<Events, Signals>();
+
+// 3. Use the bound Provider + hooks everywhere — fully typed.
+function App() {
+  return (
+    <t.Provider>
+      <Cart />
+    </t.Provider>
+  );
+}
+
+function Cart() {
+  const dispatch = t.useEmit(); // (e: Events) => void
+
+  const abandoned = t.usePattern("abandoned_cart", (p) =>
+    p.timestamp((e) => e.ts)
+     .when((e) => e.kind === "add_to_cart") // inside, e.sku is `string`
+     .notThen((e) => e.kind === "purchase")
+     .within(5 * 60_000)
+     // .emit returns ONLY the payload; it must satisfy Signals["abandoned_cart"].
+     // The { name, ts, payload } envelope is injected for you.
+     .emit((m) => ({ cartId: m.first().kind === "add_to_cart" ? m.first().cartId : "" })),
+    []);
+
+  // abandoned: TypedSignal<{ cartId: string }> | undefined
+  if (abandoned) showWinback(abandoned.payload.cartId);
+
+  return (
+    <button
+      // ✗ compile error: missing `sku`
+      // onClick={() => dispatch({ kind: "add_to_cart", ts: performance.now(), cartId: "x" })}
+      onClick={() => dispatch({ kind: "add_to_cart", ts: performance.now(), cartId: "x", sku: "y" })}
+    >
+      Add
+    </button>
+  );
+}
+```
+
+What the types enforce, checked at compile time:
+
+| Hook | Typed contract |
+|---|---|
+| `t.useEmit()` | `(e: Events) => void` — dispatching a malformed event is a compile error |
+| `t.usePattern(name, build)` | `name` must be `keyof Signals`; `build`'s closures receive the discriminated `Events`; `.emit` must return `Signals[name]` |
+| `t.useSignal(name)` | `TypedSignal<Signals[name]> \| undefined` |
+| `t.useSignalCallback(name, fn)` | `fn` receives `TypedSignal<Signals[name]>` |
+| `t.useWindow / useCount` | `kind` constrained to `Events["kind"]` |
+
+The untyped hooks (`useEmit`, `usePattern`, …) remain exported for dynamic /
+CEL use — `createTflo` is additive and backward-compatible.
+
 ## When to reach for tflo (and when not)
 
 Framed as alternatives + composition, not competition.
@@ -177,6 +257,12 @@ slower earlier response can never overwrite a newer one, and timeouts are
 first-class.
 
 ## API reference
+
+**Typed facade (recommended):** `createTflo<Events, Signals>()` returns a bound,
+fully-typed `{ Provider, Scope, useEmit, usePattern, useSignal,
+useSignalCallback, useWindow, useCount, useJoin, useRecorder, useTfloContext }`.
+Types exported for schema authoring: `TfloEvent`, `SignalMap`, `TypedSignal<P>`.
+See [Typed API](#typed-api-recommended).
 
 **Provider:** `TfloProvider`, `TfloScope` (isolated nested event space),
 `useTfloContext`.
