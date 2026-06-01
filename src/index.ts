@@ -57,5 +57,5 @@ export { initTflo } from "./core/wasmInit";
 // `createTflo<E, S>()` returns fully-typed, bound hooks over the soft engine.
 // The untyped hooks above remain the dynamic / CEL escape hatch.
 export { createTflo, type TfloApi, type TypedUsePatternOpts } from "./typed/createTflo";
-export { TypedPattern, type PayloadFor } from "./typed/pattern";
+export { TypedPattern, type PayloadFor, type SignalEvent } from "./typed/pattern";
 export type { TfloEvent, SignalMap, TypedSignal } from "./typed/types";
