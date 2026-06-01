@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import React from "react";
 import { describe, expect, it } from "vitest";
-import { TfloProvider, useTfloContext } from "../src/core/provider";
+import { TfloProvider, type TfloContextValue, useTfloContext } from "../src/core/provider";
 import { useEmit } from "../src/hooks/useEmit";
 import { usePattern } from "../src/hooks/usePattern";
 import { useSignalCallback } from "../src/hooks/useSignalCallback";
@@ -27,16 +27,17 @@ function abandoned(p: Pattern<Ev>) {
 describe("partitionBy — one usePattern tracks many concurrent entities", () => {
   it("emits abandoned for the flow that never completes, not the one that completes in time", async () => {
     let dispatch!: (e: Ev) => void;
+    let ctx: TfloContextValue | null = null;
     const abandonedFlows: string[] = [];
 
     function Probe() {
-      const { ready } = useTfloContext();
+      ctx = useTfloContext();
       dispatch = useEmit<Ev>();
       usePattern<Ev>("abandoned", abandoned, [], { partitionBy: (e) => e.flowId });
       useSignalCallback("abandoned", (s) => {
         abandonedFlows.push(s.payload.flowId as string);
       });
-      return <div data-testid="ready">{String(ready)}</div>;
+      return <div data-testid="ready">{String(ctx.ready)}</div>;
     }
 
     render(
@@ -44,7 +45,9 @@ describe("partitionBy — one usePattern tracks many concurrent entities", () =>
         <Probe />
       </TfloProvider>,
     );
-    await waitFor(() => expect(screen.getByTestId("ready").textContent).toBe("true"));
+    // Wait until the pattern runtime is actually registered (ready text can flip
+    // before the registration effect flushes — gating on the runtime is exact).
+    await waitFor(() => expect(ctx?.runtimes.size()).toBeGreaterThan(0));
 
     await act(async () => {
       dispatch({ kind: "flow_started", flowId: "A", ts: 0 });
