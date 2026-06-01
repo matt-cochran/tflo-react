@@ -33,7 +33,7 @@ export function useTfloDevtools(): DevtoolsState {
 
   return {
     signalLog,
-    runtimeCount: runtimes.size(),
+    runtimeCount: runtimes.runtimeCount(),
     recordedCount: recorder.events().length,
     replay: recorder.replay,
     clear: () => {

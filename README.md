@@ -161,8 +161,17 @@ first-class.
 **Provider:** `TfloProvider`, `TfloScope` (isolated nested event space),
 `useTfloContext`.
 
-**Primitives:** `useEmit()`, `usePattern(name, build, deps, { kinds?, feedback? })`,
+**Primitives:** `useEmit()`,
+`usePattern(name, build, deps, { kinds?, feedback?, partitionBy? })`,
 `useSignal(name)`, `useSignalCallback(name, fn)`.
+
+`partitionBy: e => e.flowId` makes a single `usePattern` track many concurrent
+entities — each key gets its own isolated partial-match state:
+
+```tsx
+usePattern("abandoned", abandoned, [], { partitionBy: (e) => e.flowId });
+// flow A completes in time → no signal; flow B never completes → abandoned(B)
+```
 
 **Building blocks:** `useWindow(kind, { ms, maxEvents })` → `{ events, count }`,
 `useCount(kind, { ms })`, `useJoin(left, right, { key, ts?, window })`,
@@ -210,8 +219,10 @@ npm --prefix validation run all   # RxJS vs XState vs tflo, side by side
   no-leak + replay determinism). `tsc` clean. The three `validation/*/tflo.mjs`
   demos pass.
 - **CEP correlation:** the engine's CEP layer (v0.1) has no cross-step field
-  correlation, so per-entity patterns use one runtime per key (the actor idiom),
-  shown in the examples.
+  correlation. Per-entity isolation is solved at the binding layer with
+  `partitionBy` (one runtime per key, automatically). Cross-step *value*
+  correlation (`B.value > A.value`) needs `MatchContext` in the engine — see
+  roadmap.
 - **Roadmap (the deeper moat):** CEL predicates (for full cross-tier *predicate*
   parity + server-pushed patterns), a devtools panel (partial-match inspection),
   and broader `tflo-ops` surface. See `docs/superpowers/specs`.
