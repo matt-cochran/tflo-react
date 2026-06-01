@@ -19,6 +19,7 @@ engine that runs server-side), surfaced as hooks.
 - […and the boring stuff (timer utils)](#and-the-boring-stuff-timer-utils)
 - [API reference](#api-reference)
 - [Lifecycle / SSR](#lifecycle--ssr)
+- [Testing](#testing)
 - [Build from source](#build-from-source)
 - [Status & honesty](#status--honesty)
 
@@ -217,6 +218,71 @@ second `MatchContext` arg (`(e, ctx) => …`) for cross-step correlation.
   per-signal-name, with a stable SSR snapshot.
 - **SSR / Next.js** — no `window`/WASM at import; init happens in the provider
   effect; mark client components `"use client"`.
+- **Buffer-until-ready** — the WASM engine initializes asynchronously, so an
+  event dispatched before the engine is `ready` (e.g. fired from a component's
+  mount effect) would otherwise hit zero registered runtimes and be silently
+  dropped. The bus instead **queues** pre-ready events in an ordered FIFO
+  (preserving each event's `ts`) and **drains** them in original order once the
+  engine is ready and `usePattern` registrations have flushed — covering both
+  the pre-ready window and the same-commit registration race. After that the
+  delivery path is the normal synchronous one (feedback/replay unchanged). The
+  queue is capped at **10 000** events (`MAX_BUFFER`); on overflow the oldest are
+  dropped and counted on `bus.droppedCount`.
+- **Init-failure signal** — if WASM init *rejects*, the app must not hang
+  silently. `useTfloContext()` exposes an **`error: unknown | null`** field: the
+  provider catches the failure, sets `error`, and leaves `ready=false`. Render a
+  fallback when `error` is non-null:
+
+  ```tsx
+  function Gate({ children }: { children: React.ReactNode }) {
+    const { ready, error } = useTfloContext();
+    if (error) return <EngineFailed error={error} />;
+    if (!ready) return <Spinner />;
+    return <>{children}</>;
+  }
+  ```
+
+## Testing
+
+`@tflo/react/testing` gives consumers a deterministic surface so tests never
+hand-roll registration gating (`waitFor(() => runtimes.size() > 0)`). It is
+built on `@testing-library/react` (a test-only optional peer — never pulled into
+the main bundle).
+
+```tsx
+import { renderWithTflo, dispatchAndSettle, TestClock } from "@tflo/react/testing";
+
+it("derives rage from clicks", async () => {
+  let dispatch!: (e: Ev) => void;
+  function App() {
+    dispatch = useEmit<Ev>();
+    usePattern<Ev>("rage", rage3, []);
+    return <Signal name="rage" />;
+  }
+
+  // Resolves ONLY after the engine is ready (buffer drained).
+  const { settle, ctx } = await renderWithTflo(<App />);
+
+  const clock = new TestClock();
+  dispatch({ kind: "click", ts: clock.now() });
+  dispatch({ kind: "click", ts: clock.advance(200) });
+  dispatch({ kind: "click", ts: clock.advance(200) });
+  await settle();               // flush effects + microtasks + buffer drain
+
+  expect(ctx.signals.get("rage")).toBeDefined();
+});
+```
+
+- **`renderWithTflo(ui, opts?)`** — renders `ui` inside a `TfloProvider`,
+  resolves once the engine is `ready` (or init errored, so failure tests don't
+  hang), and returns the RTL result plus `settle()` and the live `ctx`.
+  `opts.init` injects a custom (e.g. rejecting) engine init.
+- **`settle()`** — flushes pending React effects + microtasks (and the bus
+  buffer drain) so `dispatch(...); await settle();` deterministically observes
+  signals without any `waitFor`.
+- **`dispatchAndSettle(dispatch, events)`** — dispatch a list, then `settle()`.
+- **`TestClock`** — deterministic monotonic event-time clock
+  (`now` / `advance` / `set` / `reset`) for stamping test event `ts` values.
 
 ## Build from source
 
@@ -226,7 +292,7 @@ git clone https://github.com/matt-cochran/tflo-react
 cd tflo-react
 npm install
 npm run build:wasm    # wasm-pack builds ../tflo's cep + ops crates → src/wasm/
-npm test              # 16 tests, driving the real WASM
+npm test              # full suite, driving the real WASM
 npm --prefix validation run all   # RxJS vs XState vs tflo, side by side
 ```
 
