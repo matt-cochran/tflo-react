@@ -18,6 +18,10 @@
     "./cel": {
       "import": "./dist/cel/index.js",
       "types": "./dist/cel/index.d.ts"
+    },
+    "./testing": {
+      "import": "./dist/testing/index.js",
+      "types": "./dist/testing/index.d.ts"
     }
   },
   "files": [
@@ -39,7 +43,14 @@
   },
   "peerDependencies": {
     "react": ">=18",
-    "react-dom": ">=18"
+    "react-dom": ">=18",
+    "@testing-library/react": ">=16"
+  },
+  "peerDependenciesMeta": {
+    "@testing-library/react": {
+      "comment": "Only needed when importing the test-only `@tflo/react/testing` entry; never pulled into the main bundle.",
+      "optional": true
+    }
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.4.0",
