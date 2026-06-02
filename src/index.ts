@@ -11,6 +11,15 @@ export { usePattern, type UsePatternOpts } from "./hooks/usePattern";
 export { useSignal } from "./hooks/useSignal";
 export { useSignalCallback } from "./hooks/useSignalCallback";
 
+// Provenance — "why did this signal fire?" (opt-in via TfloProvider `trace`)
+export { useExplain } from "./hooks/useExplain";
+export {
+  TraceStore,
+  causesFrom,
+  type CauseRef,
+  type TraceNode,
+} from "./core/provenance";
+
 // Building blocks
 export { useWindow, useCount, type WindowOpts, type WindowState } from "./hooks/useWindow";
 export { useJoin } from "./hooks/useJoin";

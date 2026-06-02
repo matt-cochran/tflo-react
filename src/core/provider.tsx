@@ -8,6 +8,7 @@ import React, {
   useState,
 } from "react";
 import { EventBus } from "./eventBus";
+import { TraceStore } from "./provenance";
 import { RuntimeRegistry } from "./runtimeRegistry";
 import { SignalRegistry } from "./signalRegistry";
 import { initTflo } from "./wasmInit";
@@ -18,6 +19,11 @@ export interface TfloContextValue {
   runtimes: RuntimeRegistry;
   ready: boolean;
   /**
+   * Provenance recorder — present only when `TfloProvider` opted in via `trace`.
+   * Read causal trees with `trace.explain(name, ts)` or the `useExplain` hook.
+   */
+  trace?: TraceStore;
+  /**
    * Non-null if WASM init rejected. When set, `ready` stays `false` (the engine
    * never came up). Consumers should render a fallback rather than hang — read
    * it via `useTfloContext().error`. `null` while init is pending or succeeded.
@@ -27,11 +33,12 @@ export interface TfloContextValue {
 
 const Ctx = createContext<TfloContextValue | null>(null);
 
-function makeContext(ready: boolean): TfloContextValue {
+function makeContext(ready: boolean, trace?: boolean): TfloContextValue {
   const signals = new SignalRegistry();
   const runtimes = new RuntimeRegistry();
-  const bus = new EventBus(runtimes, signals);
-  return { bus, signals, runtimes, ready, error: null };
+  const traceStore = trace ? new TraceStore() : undefined;
+  const bus = new EventBus(runtimes, signals, traceStore);
+  return { bus, signals, runtimes, ready, error: null, trace: traceStore };
 }
 
 /**
@@ -45,15 +52,23 @@ export type InitFn = () => Promise<void>;
 export function TfloProvider({
   children,
   init = initTflo,
+  trace = false,
 }: {
   children: React.ReactNode;
   /** Override the engine init (test seam); defaults to the real WASM init. */
   init?: InitFn;
+  /**
+   * Opt into provenance recording. When `true`, every emitted signal's
+   * `payload.causes` and every raw event are logged to a `TraceStore` exposed on
+   * `useTfloContext().trace` (and the `useExplain` hook). Off by default — zero
+   * overhead when unused.
+   */
+  trace?: boolean;
 }) {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<unknown | null>(null);
   const ref = useRef<TfloContextValue | null>(null);
-  if (!ref.current) ref.current = makeContext(false);
+  if (!ref.current) ref.current = makeContext(false, trace);
 
   useEffect(() => {
     let alive = true;

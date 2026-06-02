@@ -18,6 +18,7 @@ import initCepCel, {
   type WasmCompiledPattern,
 } from "../wasm/cep-cel/tflo_cep_wasm.js";
 import type { DerivedSignal, EmitOutput, Match } from "../core/pattern";
+import type { TfloEvent, SignalMap } from "../typed/types";
 
 let inflight: Promise<void> | null = null;
 const isNode =
@@ -89,6 +90,16 @@ export class CelPattern<E extends { ts: number } = { ts: number }> {
     this.inner = this.inner.within(ms);
     return this;
   }
+  /** Strict-`next` contiguity on the most recent step (see `Pattern.next`). */
+  next(): this {
+    this.inner = this.inner.next();
+    return this;
+  }
+  /** `repeated(min..=max)` quantifier on the most recent step (see `Pattern.times`). */
+  times(min: number, max: number = min): this {
+    this.inner = this.inner.times(min, max);
+    return this;
+  }
   emit(fn: (m: Match<E>) => EmitOutput): CelCompiled<E> {
     return new CelCompiled<E>(this.inner.emit((raw: unknown) => fn(raw as Match<E>)));
   }
@@ -150,4 +161,49 @@ export function compileCelPattern<E extends { ts: number } = { ts: number }>(
   if (spec.notThen) p = p.notThenCel(spec.notThen);
   if (spec.within != null) p = p.within(spec.within);
   return p.emit(emit);
+}
+
+/**
+ * A schema-typed serializable CEL spec. The signal `name` is pinned to a key of
+ * the signal map `S`; the CEL strings stay opaque data (a string predicate
+ * can't be statically field-checked), but the `name` and the emitted `payload`
+ * ARE checked against the schema — the statically-knowable surface.
+ *
+ * Cross-step CEL: `then`/`notThen` predicates may reference earlier captures via
+ * `first_<field>` / `prev_<field>` / `s{i}_<field>` (parity with `MatchContext`).
+ */
+export interface TypedCelSpec<S extends SignalMap, K extends keyof S & string> {
+  name: K;
+  when: string;
+  then?: string[];
+  notThen?: string;
+  /** ms bound applied to the last step. */
+  within?: number;
+}
+
+/**
+ * Typed CEL bridge — `compileCelPattern` generic over `<E, S>`. The emit closure
+ * returns ONLY the payload, checked against `S[K]`; the wrapper injects
+ * `{ name, ts, payload }` (same contract as the typed `createTflo().usePattern`
+ * `.emit`). Use it to author serializable/server-pushable CEL patterns that are
+ * still schema-safe at the authoring boundary.
+ */
+export function compileTypedCelPattern<
+  E extends TfloEvent,
+  S extends SignalMap,
+  K extends keyof S & string,
+>(
+  spec: TypedCelSpec<S, K>,
+  timestamp: (e: E) => number,
+  emit: (m: Match<E>) => S[K],
+): CelCompiled<E> {
+  let p = new CelPattern<E>(spec.name).timestamp(timestamp).whenCel(spec.when);
+  for (const t of spec.then ?? []) p = p.thenCel(t);
+  if (spec.notThen) p = p.notThenCel(spec.notThen);
+  if (spec.within != null) p = p.within(spec.within);
+  return p.emit((m) => ({
+    name: spec.name,
+    ts: m.last().ts,
+    payload: emit(m) as Record<string, unknown>,
+  }));
 }

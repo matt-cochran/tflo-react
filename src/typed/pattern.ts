@@ -200,6 +200,29 @@ export class TypedPattern<
     return this;
   }
 
+  /**
+   * Make the most recent step **strictly contiguous** (`next`): the event
+   * immediately following the previous capture must satisfy it, else the partial
+   * match dies — "B directly follows A" / "no event between A and B". A modifier
+   * on the last step, so the step tuple is unchanged.
+   */
+  next(): this {
+    this.inner = this.inner.next();
+    return this;
+  }
+
+  /**
+   * Make the most recent step a `repeated(min..=max)` quantifier — it matches its
+   * predicate between `min` and `max` times (each captured), then advances. A
+   * modifier on the last step (the step tuple's element type is unchanged; the
+   * step simply captures multiple events of that type). `min`/`max` are clamped
+   * to `1 <= min <= max`.
+   */
+  times(min: number, max: number = min): this {
+    this.inner = this.inner.times(min, max);
+    return this;
+  }
+
   // ── Signal steps. Each appends `SignalEvent<S, N>` to the step tuple, so the
   //    `.emit` Match sees the re-entered signal with `name: N` + `payload: S[N]`.
 

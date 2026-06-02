@@ -17,6 +17,7 @@
  * after `open()`. The queue is capped (see `MAX_BUFFER`) to avoid unbounded
  * growth; events past the cap are dropped (oldest first) and counted.
  */
+import type { CauseRef, TraceStore } from "./provenance";
 import type { RuntimeRegistry } from "./runtimeRegistry";
 import type { SignalRegistry } from "./signalRegistry";
 
@@ -46,6 +47,8 @@ export class EventBus {
   constructor(
     private readonly runtimes: RuntimeRegistry,
     private readonly signals: SignalRegistry,
+    /** Opt-in provenance recorder; when set, raw events + signal causes are logged. */
+    private readonly trace?: TraceStore,
   ) {}
 
   /** True while events are being queued (engine not yet ready). */
@@ -105,8 +108,19 @@ export class EventBus {
   /** Synchronous delivery path: taps → runtimes → signals → feedback. */
   private deliver(ev: Event, depth: number): void {
     for (const tap of [...this.taps]) tap(ev);
+    // Provenance: log raw user events as leaves (re-entered `kind:"signal"`
+    // events are recorded via their emitting signal below, not here).
+    if (this.trace && ev.kind !== "signal" && typeof ev.kind === "string") {
+      this.trace.recordEvent({ name: ev.kind, ts: ev.ts });
+    }
     const emitted = this.runtimes.pushAll(ev);
-    for (const signal of emitted) this.signals.publish(signal.name, signal);
+    for (const signal of emitted) {
+      this.signals.publish(signal.name, signal);
+      if (this.trace) {
+        const causes = (signal.payload?.causes as CauseRef[] | undefined) ?? [];
+        this.trace.recordSignal(signal.name, signal.ts, causes);
+      }
+    }
 
     if (depth < MAX_FEEDBACK_DEPTH) {
       for (const signal of emitted) {

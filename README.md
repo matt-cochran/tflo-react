@@ -283,6 +283,18 @@ usePattern("abandoned", abandoned, [], { partitionBy: (e) => e.flowId });
 `useCount(kind, { ms })`, `useJoin(left, right, { key, ts?, window })`,
 `useRecorder({ maxEvents })` → `{ events, replay, clear }`.
 
+**Provenance (opt-in):** pass `trace` to the provider (`<Provider trace>`) and the
+library records every signal's `payload.causes` + raw events into a `TraceStore`,
+exposed via `useTfloContext().trace` and the reactive **`useExplain(name)`** hook
+(returns the latest cause tree — "why did this fire?"). Build a signal's causes
+with the `causesFrom(m.all())` helper in `.emit`. Off by default (zero overhead).
+
+```tsx
+.emit((m) => ({ name: "DeveloperBlocked", payload: { causes: causesFrom(m.all()) } }))
+// elsewhere, inside <Provider trace>:
+const why = useExplain("DeveloperBlocked"); // { name, ts, kind, children: [...] }
+```
+
 **Hooks:** `useDebounced`, `useThrottled`, `useIdle`, `useRateLimit`,
 `useAsyncGuard`.
 
@@ -298,20 +310,26 @@ second `MatchContext` arg (`(e, ctx) => …`) for cross-step correlation.
 
 - **WASM handles always freed** — a single runtime registry owns every compiled
   pattern + runtime and frees them on unmount/recompile (leak-tested).
-- **React 18 StrictMode-safe** — ref-counted registration; double-mount does not
-  double-register or double-free (tested).
+- **Race-proof registration** — patterns register **synchronously during render**
+  (the first time the engine is `ready`), not in a passive effect, so a pattern
+  mounted *after* the engine is ready can't miss an event dispatched in the same
+  commit (e.g. from a sibling layout effect). Tested with an 8× no-flake gate.
+- **React 18 StrictMode-safe** — ref-counted, id-keyed registration; double
+  render/mount does not double-register or double-free (tested).
 - **`useSyncExternalStore`** is the subscription substrate — concurrent-safe,
   per-signal-name, with a stable SSR snapshot.
 - **SSR / Next.js** — no `window`/WASM at import; init happens in the provider
-  effect; mark client components `"use client"`.
+  effect; mark client components `"use client"`. Full bundler + SSR + lazy-load
+  guide: **[docs/integration.md](docs/integration.md)**.
 - **Buffer-until-ready** — the WASM engine initializes asynchronously, so an
   event dispatched before the engine is `ready` (e.g. fired from a component's
   mount effect) would otherwise hit zero registered runtimes and be silently
   dropped. The bus instead **queues** pre-ready events in an ordered FIFO
   (preserving each event's `ts`) and **drains** them in original order once the
-  engine is ready and `usePattern` registrations have flushed — covering both
-  the pre-ready window and the same-commit registration race. After that the
-  delivery path is the normal synchronous one (feedback/replay unchanged). The
+  engine is ready. This is the pre-ready safety net; the *post*-ready
+  same-commit race is closed separately by synchronous registration (above).
+  After draining, the delivery path is the normal synchronous one
+  (feedback/replay unchanged). The
   queue is capped at **10 000** events (`MAX_BUFFER`); on overflow the oldest are
   dropped and counted on `bus.droppedCount`.
 - **Init-failure signal** — if WASM init *rejects*, the app must not hang

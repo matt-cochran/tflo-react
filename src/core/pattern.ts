@@ -93,6 +93,28 @@ export class Pattern<E extends { ts: number } = { ts: number }> {
     return this;
   }
 
+  /**
+   * Make the most recent step **strictly contiguous**: the event immediately
+   * following the previous capture must satisfy it, else the partial match dies.
+   * Expresses "B directly follows A" / "no event between A and B". The default
+   * (without `.next()`) is skip-till-match ("eventually").
+   */
+  next(): this {
+    this.inner = this.inner.next();
+    return this;
+  }
+
+  /**
+   * Make the most recent step a `repeated(min..=max)` quantifier — it matches its
+   * predicate between `min` and `max` times (capturing each), then advances.
+   * Replaces faked count-via-repeated-`.then`. `min`/`max` are clamped to
+   * `1 <= min <= max`.
+   */
+  times(min: number, max: number = min): this {
+    this.inner = this.inner.times(min, max);
+    return this;
+  }
+
   emit(fn: (m: Match<E>) => EmitOutput): CompiledPattern<E> {
     const compiled = this.inner.emit((raw: unknown) => fn(raw as Match<E>));
     this.finalized = true;
