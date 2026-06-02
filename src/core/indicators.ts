@@ -1,9 +1,12 @@
 /**
- * Thin typed facades over the rest of tflo's `ops` WASM surface — the
- * streaming technical-analysis / signal-processing catalog (SMA, EMA, RSI,
- * Bollinger, MACD, threshold crossings) plus CEL rule evaluation. These run
- * the same Rust engine used server-side. Batch (whole-array) helpers; for live
- * streams compose them with `useWindow` or feed via `useEmit`.
+ * Thin typed facades over tflo's `ops` WASM surface — the streaming
+ * technical-analysis / signal-processing catalog (SMA, EMA, RSI, Bollinger,
+ * MACD, threshold crossings). These run the same Rust engine used server-side.
+ * Batch (whole-array) helpers; for live streams compose them with `useWindow`
+ * or feed via `useEmit`. Math-only: CEL rule evaluation lives in
+ * `@tflo/react/cel` (it needs the heavier CEL-enabled wasm).
+ *
+ * Reachable via the `@tflo/react/ops` entry, which lazily loads the ops wasm.
  */
 import {
   compute_sma,
@@ -12,7 +15,6 @@ import {
   compute_bollinger,
   compute_macd,
   detect_cross,
-  evaluate_rules,
 } from "../wasm/ops/tflo_wasm.js";
 
 export interface Tick {
@@ -53,15 +55,3 @@ export const cross = (
   direction: "above" | "below" | "both" = "both",
 ): { value: number; direction: "above" | "below" }[] =>
   call(detect_cross, ticks, { threshold, direction });
-
-export interface CelRule {
-  name: string;
-  condition: string;
-  action?: { type: string };
-}
-
-export const evaluateRules = (
-  rules: { rules: CelRule[] },
-  items: Record<string, unknown>[],
-): { item_id: string; matched_rules: string[] }[] =>
-  JSON.parse(evaluate_rules(JSON.stringify(rules), JSON.stringify(items)));

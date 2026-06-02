@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { TfloProvider, useTfloContext } from "../src/core/provider";
 import { useEmit } from "../src/hooks/useEmit";
 import { usePattern } from "../src/hooks/usePattern";
-import { useCelRules } from "../src/hooks/useCelRules";
+import { useCelRules } from "../src/cel/index";
 import { TfloDevtools } from "../src/devtools/index";
 import { Pattern } from "../src/core/pattern";
 

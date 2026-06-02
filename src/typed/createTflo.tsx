@@ -41,12 +41,9 @@ export interface TfloApi<E extends TfloEvent, S extends SignalMap> {
   ) => void;
   useWindow: (kind: E["kind"], opts: core.WindowOpts) => core.WindowState<E>;
   useCount: (kind: E["kind"], opts: core.WindowOpts) => number;
-  useJoin: <L extends E, R extends E>(
-    left: L[],
-    right: R[],
-    cfg: core.KeyedJoinConfig,
-  ) => core.JoinedPair<L, R>[];
   useRecorder: (opts?: core.RecorderOpts) => core.Recorder;
+  // Note: keyed event-time joins (`useJoin`) and the indicator catalog live in
+  // the opt-in `@tflo/react/ops` entry, so the typed root API stays lean.
 }
 
 export function createTflo<E extends TfloEvent, S extends SignalMap>(): TfloApi<E, S> {
@@ -85,15 +82,6 @@ export function createTflo<E extends TfloEvent, S extends SignalMap>(): TfloApi<
       core.useWindow<E>(kind, opts),
 
     useCount: (kind: E["kind"], opts: core.WindowOpts): number => core.useCount(kind, opts),
-
-    useJoin: (<L extends E, R extends E>(
-      left: L[],
-      right: R[],
-      cfg: core.KeyedJoinConfig,
-    ): core.JoinedPair<L, R>[] => core.useJoin<L, R>(left, right, cfg)) as TfloApi<
-      E,
-      S
-    >["useJoin"],
 
     useRecorder: (opts?: core.RecorderOpts): core.Recorder => core.useRecorder(opts),
   };

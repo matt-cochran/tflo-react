@@ -22,7 +22,6 @@ export {
 
 // Building blocks
 export { useWindow, useCount, type WindowOpts, type WindowState } from "./hooks/useWindow";
-export { useJoin } from "./hooks/useJoin";
 export { useRecorder, type Recorder, type RecorderOpts } from "./hooks/useRecorder";
 
 // Pattern builder + types
@@ -36,18 +35,10 @@ export {
   type DerivedSignal,
 } from "./core/pattern";
 
-// Engine facades (event-time ops)
-export {
-  windowJoinKeyed,
-  tumblingWindow,
-  type KeyedJoinConfig,
-  type JoinedPair,
-  type TumblingConfig,
-  type TumblingWindowResult,
-} from "./core/ops";
-
-// CEL rules-as-data (server-pushable behavior; cross-tier parity stepping stone)
-export { useCelRules } from "./hooks/useCelRules";
+// Event-time ops (windows/joins) + indicators are an opt-in entry — they pull
+// the heavier `ops` wasm. Import them from `@tflo/react/ops`. CEL rules-as-data
+// (`useCelRules`) and CEL-string patterns live in `@tflo/react/cel`. Keeping
+// them out of the root entry is what holds the main bundle at ~17 KB gzip.
 
 // Shipped ergonomic hooks
 export { useDebounced } from "./temporal/useDebounced";
@@ -56,10 +47,8 @@ export { useIdle } from "./temporal/useIdle";
 export { useRateLimit } from "./temporal/useRateLimit";
 export { useAsyncGuard } from "./temporal/useAsyncGuard";
 
-// Streaming indicators / detectors / CEL (the rest of tflo's ops surface)
-export * as indicators from "./core/indicators";
-
-// WASM init (advanced; the provider calls this for you)
+// WASM init (advanced; the provider calls this for you). `initTfloOps` lives in
+// the `@tflo/react/ops` entry.
 export { initTflo } from "./core/wasmInit";
 
 // ── Typed public API (RECOMMENDED) ──────────────────────────────────────────

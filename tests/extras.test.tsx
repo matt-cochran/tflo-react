@@ -6,7 +6,7 @@ import { useEmit } from "../src/hooks/useEmit";
 import { usePattern } from "../src/hooks/usePattern";
 import { useSignalCallback } from "../src/hooks/useSignalCallback";
 import { useRecorder, type Recorder } from "../src/hooks/useRecorder";
-import { initTflo } from "../src/core/wasmInit";
+import { initTfloOps } from "../src/core/wasmInit";
 import * as indicators from "../src/core/indicators";
 import { Pattern } from "../src/core/pattern";
 
@@ -65,7 +65,7 @@ describe("useRecorder — deterministic replay re-derives the same signals", () 
 
 describe("indicators — the rest of tflo's ops surface, typed", () => {
   beforeAll(async () => {
-    await initTflo();
+    await initTfloOps();
   });
   it("computes a simple moving average via the WASM engine", () => {
     const ticks = [1, 2, 3, 4, 5].map((value, ts) => ({ ts, value }));

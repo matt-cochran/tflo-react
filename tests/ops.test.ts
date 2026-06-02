@@ -1,9 +1,9 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { initTflo } from "../src/core/wasmInit";
+import { initTfloOps } from "../src/core/wasmInit";
 import { tumblingWindow, windowJoinKeyed } from "../src/core/ops";
 
 beforeAll(async () => {
-  await initTflo();
+  await initTfloOps();
 });
 
 describe("scenario 2 — keyed event-time temporal join", () => {

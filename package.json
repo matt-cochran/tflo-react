@@ -11,6 +11,10 @@
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
     },
+    "./ops": {
+      "import": "./dist/ops/index.js",
+      "types": "./dist/ops/index.d.ts"
+    },
     "./devtools": {
       "import": "./dist/devtools/index.js",
       "types": "./dist/devtools/index.d.ts"
@@ -34,6 +38,7 @@
   "comment:files": "The `validation/` directory (RxJS/XState reproduction suite proving the claims) is intentionally NOT in this allowlist, so it is never shipped in the published npm package. It lives in the GitHub repo as CI-run evidence only.",
   "scripts": {
     "build:wasm": "bash scripts/build-wasm.sh",
+    "check:size": "node scripts/check-wasm-size.mjs",
     "build:ts": "tsc -p tsconfig.json && rm -rf dist/wasm && cp -r src/wasm dist/wasm",
     "build": "npm run build:wasm && npm run build:ts",
     "test": "vitest run",

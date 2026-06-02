@@ -12,11 +12,14 @@
  * behavior the roadmap is about. CEL expressions reference event fields
  * directly, e.g. `kind == "add_to_cart"`.
  */
+import { useEffect, useMemo, useState } from "react";
 import initCepCel, {
   WasmPattern,
   WasmPatternRuntime,
   type WasmCompiledPattern,
 } from "../wasm/cep-cel/tflo_cep_wasm.js";
+import initOpsCel, { evaluate_rules } from "../wasm/ops-cel/tflo_wasm.js";
+import { makeLazyInit } from "../core/wasmInit";
 import type { DerivedSignal, EmitOutput, Match } from "../core/pattern";
 import type { TfloEvent, SignalMap } from "../typed/types";
 
@@ -206,4 +209,61 @@ export function compileTypedCelPattern<
     ts: m.last().ts,
     payload: emit(m) as Record<string, unknown>,
   }));
+}
+
+// ── CEL rule evaluation (rules-as-data) ─────────────────────────────────────
+// Moved here from the main entry: evaluate_rules lives in the CEL-enabled ops
+// wasm (`ops-cel`), so it belongs behind the opt-in `@tflo/react/cel` entry
+// rather than bloating the lean core.
+
+const opsCel = makeLazyInit(initOpsCel as never, "../wasm/ops-cel/tflo_wasm_bg.wasm");
+
+/** Explicitly (pre)load the CEL-enabled ops wasm (for `evaluateRules`). Idempotent. */
+export function initTfloOpsCel(): Promise<void> {
+  return opsCel.load();
+}
+
+export interface CelRule {
+  name: string;
+  condition: string;
+  action?: { type: string };
+}
+
+/** Evaluate CEL rules (as serializable DATA) against items. Requires `ops-cel` loaded. */
+export function evaluateRules(
+  rules: { rules: CelRule[] },
+  items: Record<string, unknown>[],
+): { item_id: string; matched_rules: string[] }[] {
+  return JSON.parse(evaluate_rules(JSON.stringify(rules), JSON.stringify(items)));
+}
+
+let opsCelLoaded = false;
+function useOpsCelReady(): boolean {
+  const [ready, setReady] = useState(opsCelLoaded);
+  useEffect(() => {
+    if (opsCelLoaded) return;
+    let active = true;
+    void initTfloOpsCel().then(() => {
+      opsCelLoaded = true;
+      if (active) setReady(true);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+  return ready;
+}
+
+/**
+ * Evaluate CEL rules (as DATA) against items, via tflo's CEL engine in WASM.
+ * Lazily loads the CEL-enabled ops wasm; empty until ready. Because the rules
+ * are a serializable object (not code), they can be authored once, shipped from
+ * a server, and evaluated identically on client and Rust server.
+ */
+export function useCelRules(
+  rules: { rules: CelRule[] },
+  items: Record<string, unknown>[],
+): { item_id: string; matched_rules: string[] }[] {
+  const ready = useOpsCelReady();
+  return useMemo(() => (ready ? evaluateRules(rules, items) : []), [ready, rules, items]);
 }
