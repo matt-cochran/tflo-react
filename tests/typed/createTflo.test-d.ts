@@ -80,3 +80,23 @@ const r = t.usePattern("rage", (p) =>
   p.when((e) => e.kind === "add_to_cart").emit(() => ({ count: 1 })),
 );
 expectTypeOf(r).toEqualTypeOf<TypedSignal<{ count: number }> | undefined>();
+
+// ── Friction 3 (end-to-end): an `interface` signal map drives createTflo with
+//    full payload inference — previously rejected because an interface has no
+//    implicit string index signature. ─────────────────────────────────────────
+interface IfaceSignals {
+  abandoned_cart: { cartId: string };
+  rage: { count: number };
+}
+const ti = createTflo<Events, IfaceSignals>();
+const isig = ti.useSignal("abandoned_cart");
+expectTypeOf(isig).toEqualTypeOf<TypedSignal<{ cartId: string }> | undefined>();
+ti.useSignalCallback("rage", (s) => {
+  const n: number = s.payload.count;
+  void n;
+});
+ti.usePattern("rage", (p) =>
+  p.when((e) => e.kind === "add_to_cart").emit(() => ({ count: 1 })),
+);
+// @ts-expect-error name must be a key of the interface signal map
+ti.useSignal("not_a_signal");

@@ -8,7 +8,7 @@
  */
 import { expectTypeOf } from "expect-type";
 import { Pattern } from "../../src/core/pattern";
-import { createTflo, TypedPattern } from "../../src/index";
+import { createTflo, TypedPattern, type SignalEvent } from "../../src/index";
 
 type Events =
   | { kind: "add_to_cart"; ts: number; cartId: string; sku: string }
@@ -36,17 +36,30 @@ tp.thenSignal("nope");
 // @ts-expect-error "nope" is not a key of Signals
 tp.notThenSignal("nope");
 
-// ── Assertion 2: the captured signal's payload is S[name] (after narrow). ──
+// ── Assertion 2: m.first() IS the typed SignalEvent<S,"rage"> — no narrow. ──
+// With per-step tuple typing, whenSignal("rage") makes step 0 SignalEvent<S,
+// "rage"> directly, so `m.first().payload.count` is `number` with NO narrowing.
 new TypedPattern<Events, Signals, "summary">(raw, "summary")
   .whenSignal("rage")
   .emit((m) => {
     const e = m.first();
-    if (e.kind === "signal" && e.name === "rage") {
-      // payload narrows to Signals["rage"] = { count: number }
-      expectTypeOf(e.payload).toEqualTypeOf<{ count: number }>();
-      const n: number = e.payload.count;
-      void n;
-    }
+    expectTypeOf(e).toEqualTypeOf<SignalEvent<Signals, "rage">>();
+    // payload is Signals["rage"] = { count: number }, read directly.
+    expectTypeOf(e.payload).toEqualTypeOf<{ count: number }>();
+    const n: number = e.payload.count;
+    void n;
+    return { reason: "x" };
+  });
+
+// ── Assertion 2b: thenSignal makes m.last() the final SignalEvent. ──
+new TypedPattern<Events, Signals, "summary">(raw, "summary")
+  .whenSignal("rage")
+  .thenSignal("abandoned_cart")
+  .emit((m) => {
+    expectTypeOf(m.first()).toEqualTypeOf<SignalEvent<Signals, "rage">>();
+    expectTypeOf(m.last()).toEqualTypeOf<SignalEvent<Signals, "abandoned_cart">>();
+    const cartId: string = m.last().payload.cartId;
+    void cartId;
     return { reason: "x" };
   });
 
