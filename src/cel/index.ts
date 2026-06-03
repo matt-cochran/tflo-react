@@ -172,6 +172,14 @@ export interface CelPatternSpec {
   notThen?: string;
   /** ms bound applied to the last step. */
   within?: number;
+  /**
+   * Optional rule version. When the rule fires, the emitted derived event
+   * (signal / verdict / correction) carries this version, so the log records
+   * which version produced each result — versioning falls out of immutable
+   * derived events, no event-time effective-dating needed. Mirrors the Rust
+   * serde `version` field.
+   */
+  version?: number;
 }
 
 /**
@@ -216,6 +224,14 @@ export interface TypedCelSpec<S extends SignalMap, K extends keyof S & string> {
   notThen?: string;
   /** ms bound applied to the last step. */
   within?: number;
+  /**
+   * Optional rule version. When the rule fires, the emitted derived event
+   * (signal / verdict / correction) carries this version, so the log records
+   * which version produced each result — versioning falls out of immutable
+   * derived events, no event-time effective-dating needed. Mirrors the Rust
+   * serde `version` field.
+   */
+  version?: number;
 }
 
 /**
