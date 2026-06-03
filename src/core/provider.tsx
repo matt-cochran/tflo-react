@@ -33,11 +33,11 @@ export interface TfloContextValue {
 
 const Ctx = createContext<TfloContextValue | null>(null);
 
-function makeContext(ready: boolean, trace?: boolean): TfloContextValue {
+function makeContext(ready: boolean, trace?: boolean, autoClock?: boolean): TfloContextValue {
   const signals = new SignalRegistry();
   const runtimes = new RuntimeRegistry();
   const traceStore = trace ? new TraceStore() : undefined;
-  const bus = new EventBus(runtimes, signals, traceStore);
+  const bus = new EventBus(runtimes, signals, traceStore, autoClock);
   return { bus, signals, runtimes, ready, error: null, trace: traceStore };
 }
 
@@ -53,6 +53,7 @@ export function TfloProvider({
   children,
   init = initTflo,
   trace = false,
+  autoClock = false,
 }: {
   children: React.ReactNode;
   /** Override the engine init (test seam); defaults to the real WASM init. */
@@ -64,11 +65,18 @@ export function TfloProvider({
    * overhead when unused.
    */
   trace?: boolean;
+  /**
+   * Opt into the self-driving clock so "A then no B within T" rules fire on
+   * absence with no event. Assumes event-time is wall-clock-ms (stamp events with
+   * real timestamps). Off by default — apps using logical timestamps drive
+   * `useTfloContext().bus.tick(now)` themselves.
+   */
+  autoClock?: boolean;
 }) {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<unknown | null>(null);
   const ref = useRef<TfloContextValue | null>(null);
-  if (!ref.current) ref.current = makeContext(false, trace);
+  if (!ref.current) ref.current = makeContext(false, trace, autoClock);
 
   useEffect(() => {
     let alive = true;
@@ -84,6 +92,8 @@ export function TfloProvider({
     );
     return () => {
       alive = false;
+      // Clear any pending self-driving clock timer so it can't fire post-unmount.
+      ref.current?.bus.dispose();
     };
     // `init` is intentionally read once on mount; changing it mid-life is unsupported.
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -175,6 +175,19 @@ export class PatternRuntime<E extends { ts: number } = { ts: number }> {
   flush(): DerivedSignal[] {
     return this.normalize(this.inner.flush());
   }
+  /**
+   * Advance logical time to `now` (ms) WITHOUT an event, firing any
+   * deadline-reached matches — the self-driving "A then no B within T" case.
+   * The provider's clock driver calls this at {@link nextDeadline}; the engine
+   * reads no wall clock, so a tick-driven run is identical to an event at `now`.
+   */
+  tick(now: number): DerivedSignal[] {
+    return this.normalize(this.inner.tick(now));
+  }
+  /** Earliest pending deadline (ms) across in-flight partials, or `undefined`. */
+  get nextDeadline(): number | undefined {
+    return this.inner.nextDeadline;
+  }
   reset(): void {
     this.inner.reset();
   }

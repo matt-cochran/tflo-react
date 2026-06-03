@@ -42,6 +42,13 @@ export interface TfloApi<E extends TfloEvent, S extends SignalMap> {
   useWindow: (kind: E["kind"], opts: core.WindowOpts) => core.WindowState<E>;
   useCount: (kind: E["kind"], opts: core.WindowOpts) => number;
   useRecorder: (opts?: core.RecorderOpts) => core.Recorder;
+  /** Derived state per entity, folded from events (raw + derived). Replaces a
+   * hand-maintained status flag with `status = fold(history)`. */
+  useProjection: <K, St>(
+    key: (e: E) => K,
+    reducer: (state: St | undefined, e: E) => St,
+    opts?: core.ProjectionOpts,
+  ) => core.Projection<K, St>;
   // Note: keyed event-time joins (`useJoin`) and the indicator catalog live in
   // the opt-in `@tflo/react/ops` entry, so the typed root API stays lean.
 }
@@ -84,5 +91,11 @@ export function createTflo<E extends TfloEvent, S extends SignalMap>(): TfloApi<
     useCount: (kind: E["kind"], opts: core.WindowOpts): number => core.useCount(kind, opts),
 
     useRecorder: (opts?: core.RecorderOpts): core.Recorder => core.useRecorder(opts),
+
+    useProjection: <K, St>(
+      key: (e: E) => K,
+      reducer: (state: St | undefined, e: E) => St,
+      opts?: core.ProjectionOpts,
+    ): core.Projection<K, St> => core.useProjection<E, K, St>(key, reducer, opts),
   };
 }

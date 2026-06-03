@@ -152,6 +152,46 @@ export class RuntimeRegistry {
     return out;
   }
 
+  /**
+   * The earliest pending deadline (ms) across every owned runtime + partition,
+   * or `undefined` if nothing is waiting on a timer. The bus's clock driver
+   * schedules its next {@link tickAll} for this instant.
+   */
+  nextDeadline(): number | undefined {
+    let min: number | undefined;
+    for (const e of this.entries.values()) {
+      const d = e.runtime?.nextDeadline;
+      if (d !== undefined && (min === undefined || d < min)) min = d;
+      if (e.partitions) {
+        for (const rt of e.partitions.values()) {
+          const pd = rt.nextDeadline;
+          if (pd !== undefined && (min === undefined || pd < min)) min = pd;
+        }
+      }
+    }
+    return min;
+  }
+
+  /**
+   * Advance every owned runtime + partition to `now` WITHOUT an event, firing
+   * deadline-reached derived matches on absence. Returns the emitted signals (the
+   * bus routes them through the same publish + feedback path as `pushAll`).
+   */
+  tickAll(now: number): DerivedSignal[] {
+    const out: DerivedSignal[] = [];
+    for (const e of this.entries.values()) {
+      if (e.runtime) {
+        for (const s of e.runtime.tick(now)) out.push(s);
+      }
+      if (e.partitions) {
+        for (const rt of e.partitions.values()) {
+          for (const s of rt.tick(now)) out.push(s);
+        }
+      }
+    }
+    return out;
+  }
+
   /** Reset every runtime to fresh state (used by deterministic replay). */
   resetAll(): void {
     for (const e of this.entries.values()) {

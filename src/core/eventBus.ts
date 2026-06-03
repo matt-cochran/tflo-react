@@ -17,6 +17,7 @@
  * after `open()`. The queue is capped (see `MAX_BUFFER`) to avoid unbounded
  * growth; events past the cap are dropped (oldest first) and counted.
  */
+import type { DerivedSignal } from "./pattern";
 import type { CauseRef, TraceStore } from "./provenance";
 import type { RuntimeRegistry } from "./runtimeRegistry";
 import type { SignalRegistry } from "./signalRegistry";
@@ -43,12 +44,31 @@ export class EventBus {
   private buffer: Event[] | null = [];
   /** Number of pre-ready events dropped because the buffer cap was hit. */
   droppedCount = 0;
+  /**
+   * Self-driving clock: a single coalesced timer armed at the earliest pending
+   * deadline across all runtimes. This is the *host* driver — it reads the page
+   * clock and calls the engine's pure `tick`; the engine never reads a clock, so
+   * replay/parity hold. `null` when no deadline is pending.
+   */
+  private clockTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private readonly runtimes: RuntimeRegistry,
     private readonly signals: SignalRegistry,
     /** Opt-in provenance recorder; when set, raw events + signal causes are logged. */
     private readonly trace?: TraceStore,
+    /**
+     * Opt into the self-driving clock: when `true`, the bus arms a coalesced
+     * timer at the earliest pending deadline and `tick`s the engine when it
+     * fires, so "A then no B within T" fires on absence with no event.
+     *
+     * **Assumes event-time is wall-clock-ms** (the default `useEmit` stamp). Apps
+     * using explicit logical timestamps leave this off (the default) and drive
+     * {@link tick} themselves — otherwise wall-clock wake-ups would advance the
+     * engine past logical deadlines. Off by default preserves event-time
+     * semantics for existing apps.
+     */
+    private readonly autoClock = false,
   ) {}
 
   /** True while events are being queued (engine not yet ready). */
@@ -71,6 +91,7 @@ export class EventBus {
     const queued = this.buffer;
     this.buffer = null; // deliver() now takes the synchronous path
     for (const ev of queued) this.deliver(ev, 0);
+    this.scheduleClock();
   }
 
   /** Observe every dispatched event (used by building blocks like useWindow). */
@@ -103,6 +124,29 @@ export class EventBus {
     }
 
     this.deliver(ev, depth);
+    if (depth === 0) this.scheduleClock();
+  }
+
+  /**
+   * Advance logical time to `now` WITHOUT an event, firing any deadline-reached
+   * derived matches (the self-driving "A then no B within T" case) through the
+   * same publish + feedback + trace path as a real event. Idempotent. Exposed so
+   * tests/demos can drive virtual time; the bus's own clock driver calls it at
+   * each pending deadline using the page clock.
+   */
+  tick(nowMs: number): void {
+    if (this.buffer !== null) return; // not ready yet; deadlines fire after open()
+    const emitted = this.runtimes.tickAll(nowMs);
+    this.emit(emitted, 0);
+    this.scheduleClock();
+  }
+
+  /** Clear the pending clock timer (call on provider unmount to avoid leaks). */
+  dispose(): void {
+    if (this.clockTimer !== null) {
+      clearTimeout(this.clockTimer);
+      this.clockTimer = null;
+    }
   }
 
   /** Synchronous delivery path: taps → runtimes → signals → feedback. */
@@ -113,7 +157,12 @@ export class EventBus {
     if (this.trace && ev.kind !== "signal" && typeof ev.kind === "string") {
       this.trace.recordEvent({ name: ev.kind, ts: ev.ts });
     }
-    const emitted = this.runtimes.pushAll(ev);
+    this.emit(this.runtimes.pushAll(ev), depth);
+  }
+
+  /** Publish emitted signals and re-dispatch the feedback ones (shared by the
+   * event-driven `deliver` and the clock-driven `tick`). */
+  private emit(emitted: DerivedSignal[], depth: number): void {
     for (const signal of emitted) {
       this.signals.publish(signal.name, signal);
       if (this.trace) {
@@ -121,7 +170,6 @@ export class EventBus {
         this.trace.recordSignal(signal.name, signal.ts, causes);
       }
     }
-
     if (depth < MAX_FEEDBACK_DEPTH) {
       for (const signal of emitted) {
         if (this.runtimes.isFeedback(signal.name)) {
@@ -132,5 +180,28 @@ export class EventBus {
         }
       }
     }
+  }
+
+  /**
+   * (Re)arm the single coalesced clock timer at the earliest pending deadline.
+   * Reads the page clock (host-side); the engine stays clock-free. Assumes
+   * event-time is the same timeline the bus stamps omitted-`ts` events with
+   * (`performance.now()`); callers using explicit non-wall-clock timestamps drive
+   * {@link tick} themselves.
+   */
+  private scheduleClock(): void {
+    if (!this.autoClock) return; // opt-in; otherwise the host drives tick()
+    if (typeof setTimeout === "undefined") return; // SSR / no timers
+    if (this.clockTimer !== null) {
+      clearTimeout(this.clockTimer);
+      this.clockTimer = null;
+    }
+    const deadline = this.runtimes.nextDeadline();
+    if (deadline === undefined) return;
+    const delay = Math.max(0, deadline - now());
+    this.clockTimer = setTimeout(() => {
+      this.clockTimer = null;
+      this.tick(now());
+    }, delay);
   }
 }

@@ -31,6 +31,14 @@ export {
 export { useRecorder, type Recorder, type RecorderOpts } from "./hooks/useRecorder";
 export { useCombineLatest } from "./hooks/useCombineLatest";
 
+// Derived state, not stored state — queryable current state per entity, folded
+// from the event stream (raw + derived). Replaces hand-maintained status flags.
+export {
+  useProjection,
+  type Projection,
+  type ProjectionOpts,
+} from "./hooks/useProjection";
+
 // Observable backpressure — dropped partial matches as reactive state (B3).
 // RxJS drops silently under load; tflo makes the loss visible.
 export { useDropMetrics } from "./hooks/useDropMetrics";
