@@ -40,8 +40,10 @@ export { useCombineLatest } from "./hooks/useCombineLatest";
 // from the event stream (raw + derived). Replaces hand-maintained status flags.
 export {
   useProjection,
+  guard,
   type Projection,
   type ProjectionOpts,
+  type ProjectionState,
 } from "./hooks/useProjection";
 
 // Observable backpressure — dropped partial matches as reactive state (B3).

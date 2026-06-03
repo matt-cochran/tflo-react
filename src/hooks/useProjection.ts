@@ -27,6 +27,46 @@ export interface Projection<K, S> {
   readonly size: number;
 }
 
+/** Read-only view of a projection handed to a {@link guard}. */
+export type ProjectionState<K, S> = Pick<Projection<K, S>, "get" | "entries" | "size">;
+
+/**
+ * **Relational guard** — build a pattern predicate that reads the CURRENT derived
+ * state of OTHER entities (a {@link Projection}) to decide a match. Use it in
+ * `.when` / `.then`:
+ *
+ * ```ts
+ * // "block I2's activation while I1 is blocked" — a guard over another entity
+ * .then(guard(blockedProjection, (e, state) => state.get("I1") !== "blocked"))
+ * ```
+ *
+ * **Replay-safe by construction:** the guard reads a *projection* — a
+ * deterministic fold over the same event log, updated before matching — so the
+ * same event stream always yields the same verdict. Record the guard's decision
+ * by having the pattern's `.emit` produce a derived event (a `…Blocked` signal),
+ * which re-enters via feedback for provenance.
+ *
+ * **Determinism rule:** read a projection, NOT external mutable state. To gate on
+ * truly external state, capture that read as an emitted event first, then guard
+ * on the projection of *that* event — keeping the decision in the deterministic log.
+ */
+export function guard<E, K, S>(
+  projection: Projection<K, S>,
+  predicate: (event: E, state: ProjectionState<K, S>) => boolean,
+): (event: E) => boolean {
+  // `projection.get`/`entries` read the live store ref, so closing over the
+  // projection here (with empty pattern deps) still sees current state at match
+  // time. Expose a read-only view so a guard can't mutate the read-model.
+  const state: ProjectionState<K, S> = {
+    get: (k) => projection.get(k),
+    entries: () => projection.entries(),
+    get size() {
+      return projection.size;
+    },
+  };
+  return (event: E) => predicate(event, state);
+}
+
 /**
  * **Derived state, not stored state.** Folds the event stream into a queryable
  * *current state per entity* — the read-model half of the derived-events stack.
