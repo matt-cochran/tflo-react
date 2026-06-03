@@ -47,6 +47,14 @@ export interface DerivedSignal {
   payload: Record<string, unknown>;
 }
 
+/**
+ * Why the engine discarded a partial match. Mirrors the native `DropReason`,
+ * delivered across the WASM boundary as a string.
+ * - `"max_in_flight"` — the bounded in-flight set overflowed (backpressure).
+ * - `"deadline"` — a positive step's `within(...)` window closed unmatched.
+ */
+export type DropReason = "max_in_flight" | "deadline";
+
 /** Fluent pattern builder. Chain steps, finalize with `.emit(...)`. */
 export class Pattern<E extends { ts: number } = { ts: number }> {
   private inner: WasmPattern;
@@ -172,6 +180,20 @@ export class PatternRuntime<E extends { ts: number } = { ts: number }> {
   }
   destroy(): void {
     this.inner.free();
+  }
+
+  /**
+   * Observe dropped partial matches (C2 → JS). The handler fires once per
+   * discarded partial with the drop reason. RxJS drops silently under
+   * backpressure; this makes the loss visible. Replaces any prior handler.
+   */
+  onDrop(handler: (reason: DropReason) => void): void {
+    this.inner.setDropHandler((reason: string) => handler(reason as DropReason));
+  }
+
+  /** Monotonic lifetime count of partials this runtime has dropped. */
+  get droppedCount(): number {
+    return this.inner.droppedCount;
   }
 
   private normalize(raw: Array<unknown>): DerivedSignal[] {

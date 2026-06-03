@@ -31,6 +31,11 @@ export {
 export { useRecorder, type Recorder, type RecorderOpts } from "./hooks/useRecorder";
 export { useCombineLatest } from "./hooks/useCombineLatest";
 
+// Observable backpressure — dropped partial matches as reactive state (B3).
+// RxJS drops silently under load; tflo makes the loss visible.
+export { useDropMetrics } from "./hooks/useDropMetrics";
+export { type DropMetrics } from "./core/runtimeRegistry";
+
 // Pattern builder + types
 export {
   Pattern,
@@ -40,6 +45,7 @@ export {
   type MatchContext,
   type EmitOutput,
   type DerivedSignal,
+  type DropReason,
 } from "./core/pattern";
 
 // Event-time ops (windows/joins) + indicators are an opt-in entry — they pull
