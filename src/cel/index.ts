@@ -149,6 +149,18 @@ export class CelRuntime<E extends { ts: number } = { ts: number }> {
   flush(): DerivedSignal[] {
     return normalize(this.inner.flush(), this.patternName);
   }
+  /**
+   * Advance logical time to `now` (ms) WITHOUT an event, firing any
+   * deadline-reached matches — the self-driving "A then no B within T" case.
+   * Thin delegation to the WASM engine; the host (browser or server) drives it.
+   */
+  tick(now: number): DerivedSignal[] {
+    return normalize(this.inner.tick(now), this.patternName);
+  }
+  /** Earliest pending deadline (ms) across in-flight partials, or `undefined`. */
+  get nextDeadline(): number | undefined {
+    return this.inner.nextDeadline;
+  }
   reset(): void {
     this.inner.reset();
   }
