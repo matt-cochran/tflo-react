@@ -18,6 +18,13 @@ type Event = { ts: number; kind?: string } & Record<string, unknown>;
 export interface RegisterOpts {
   kinds?: string[];
   feedback?: boolean;
+  /**
+   * Enable the event-time reorder buffer for this pattern: events arriving up to
+   * `maxLateness` ms out of order are released to the matcher in event-time order
+   * (later ones drop as `"late"`). Off by default — most in-order live streams
+   * don't need it, and a watermark trades latency for out-of-order correctness.
+   */
+  reorder?: { maxLateness: number };
 }
 
 /**
@@ -29,6 +36,8 @@ export interface DropMetrics {
   total: number;
   maxInFlight: number;
   deadline: number;
+  /** Events dropped behind the reorder buffer's event-time frontier (too late). */
+  late: number;
 }
 
 type DropListener = () => void;
@@ -42,6 +51,8 @@ interface Entry {
   factory?: () => CompiledPattern<{ ts: number }>;
   partitionBy?: (e: Event) => unknown;
   partitions?: Map<unknown, PatternRuntime<{ ts: number }>>;
+  /** Reorder lateness applied to this pattern's runtime(s), if opted in. */
+  maxLateness?: number;
 }
 
 export class RuntimeRegistry {
@@ -51,12 +62,15 @@ export class RuntimeRegistry {
   // Observable-backpressure surface (B3): a single per-reason tally fed by every
   // runtime's drop handler, with `useSyncExternalStore`-shaped subscriptions so a
   // hook re-renders when drops occur.
-  private drops: DropMetrics = { total: 0, maxInFlight: 0, deadline: 0 };
+  private drops: DropMetrics = { total: 0, maxInFlight: 0, deadline: 0, late: 0 };
   private dropListeners = new Set<DropListener>();
 
   /** Build a runtime with its drop handler funnelling into the shared tally. */
-  private makeRuntime(compiled: CompiledPattern<{ ts: number }>): PatternRuntime<{ ts: number }> {
-    const rt = new Runtime(compiled);
+  private makeRuntime(
+    compiled: CompiledPattern<{ ts: number }>,
+    maxLateness?: number,
+  ): PatternRuntime<{ ts: number }> {
+    const rt = new Runtime(compiled, maxLateness);
     rt.onDrop((reason: DropReason) => this.recordDrop(reason));
     return rt;
   }
@@ -65,6 +79,7 @@ export class RuntimeRegistry {
     this.drops.total++;
     if (reason === "max_in_flight") this.drops.maxInFlight++;
     else if (reason === "deadline") this.drops.deadline++;
+    else if (reason === "late") this.drops.late++;
     for (const fn of [...this.dropListeners]) fn();
   }
 
@@ -95,7 +110,7 @@ export class RuntimeRegistry {
     this.entries.set(id, {
       refs: 1,
       kinds: opts.kinds ? new Set(opts.kinds) : undefined,
-      runtime: this.makeRuntime(compiled),
+      runtime: this.makeRuntime(compiled, opts.reorder?.maxLateness),
     });
     if (opts.feedback) this.feedbackNames.add(compiled.name);
   }
@@ -118,6 +133,7 @@ export class RuntimeRegistry {
       factory,
       partitionBy,
       partitions: new Map(),
+      maxLateness: opts.reorder?.maxLateness,
     });
     if (opts.feedback) this.feedbackNames.add(name);
   }
@@ -143,7 +159,7 @@ export class RuntimeRegistry {
         if (key === undefined || key === null) continue;
         let rt = e.partitions.get(key);
         if (!rt) {
-          rt = this.makeRuntime(e.factory());
+          rt = this.makeRuntime(e.factory(), e.maxLateness);
           e.partitions.set(key, rt);
         }
         for (const s of rt.push(event)) out.push(s);

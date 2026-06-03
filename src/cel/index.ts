@@ -139,8 +139,15 @@ export class CelCompiled<E extends { ts: number } = { ts: number }> {
 export class CelRuntime<E extends { ts: number } = { ts: number }> {
   private readonly inner: WasmPatternRuntime;
   readonly patternName: string;
-  constructor(pattern: CelCompiled<E>) {
-    this.inner = new WasmPatternRuntime(pattern.inner);
+  /**
+   * @param maxLateness — when set, enable the event-time reorder buffer: events
+   * arriving up to this many ms out of order are released to the matcher in
+   * event-time order (later ones drop as `"late"`). The same buffer runs on the
+   * native server, so an out-of-order stream still matches identically on both
+   * tiers. Omit for in-order behaviour.
+   */
+  constructor(pattern: CelCompiled<E>, maxLateness?: number) {
+    this.inner = new WasmPatternRuntime(pattern.inner, maxLateness);
     this.patternName = pattern.name;
   }
   push(event: E): DerivedSignal[] {

@@ -14,6 +14,14 @@ export interface UsePatternOpts<E> {
    * layer: each entity gets its own partial-match state.
    */
   partitionBy?: (e: E) => unknown;
+  /**
+   * Enable the event-time reorder buffer: events arriving up to
+   * `maxLateness` ms out of order are released to the matcher in event-time
+   * order (later ones drop as `"late"`, visible via `useDropMetrics`). Off by
+   * default — most in-order live streams don't need it, and a watermark trades
+   * latency for out-of-order correctness. The injected clock drives release.
+   */
+  reorder?: { maxLateness: number };
 }
 
 /**
@@ -53,13 +61,14 @@ export function usePattern<E extends { ts: number } = { ts: number }>(
         name,
         () => build(new Pattern<E>(name)) as unknown as CompiledPattern<{ ts: number }>,
         opts.partitionBy as (e: { ts: number } & Record<string, unknown>) => unknown,
-        { kinds: opts.kinds, feedback: opts.feedback },
+        { kinds: opts.kinds, feedback: opts.feedback, reorder: opts.reorder },
       );
     } else {
       const compiled = build(new Pattern<E>(name));
       runtimes.register(id, compiled as unknown as CompiledPattern<{ ts: number }>, {
         kinds: opts.kinds,
         feedback: opts.feedback,
+        reorder: opts.reorder,
       });
     }
     registeredRef.current = true;

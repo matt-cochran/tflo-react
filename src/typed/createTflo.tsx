@@ -21,6 +21,9 @@ export interface TypedUsePatternOpts<E extends TfloEvent> {
   kinds?: Array<E["kind"]>;
   feedback?: boolean;
   partitionBy?: (e: E) => unknown;
+  /** Event-time reorder buffer — release out-of-order events in event-time order
+   * within `maxLateness` ms (later ones drop as `"late"`). See `UsePatternOpts`. */
+  reorder?: { maxLateness: number };
 }
 
 export interface TfloApi<E extends TfloEvent, S extends SignalMap> {

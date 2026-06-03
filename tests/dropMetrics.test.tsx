@@ -84,12 +84,12 @@ describe("RuntimeRegistry drop aggregation", () => {
       .emit(() => ({ name: "dl", payload: {} }));
     reg.register("id1", compiled as never);
 
-    expect(reg.dropMetrics()).toEqual({ total: 0, maxInFlight: 0, deadline: 0 });
+    expect(reg.dropMetrics()).toEqual({ total: 0, maxInFlight: 0, deadline: 0, late: 0 });
 
     reg.pushAll({ kind: "a", ts: 0 });
     reg.pushAll({ kind: "x", ts: 500 }); // deadline sweep
 
-    expect(reg.dropMetrics()).toEqual({ total: 1, maxInFlight: 0, deadline: 1 });
+    expect(reg.dropMetrics()).toEqual({ total: 1, maxInFlight: 0, deadline: 1, late: 0 });
     expect(notified).toBeGreaterThan(0);
     unsub();
     reg.deregister("id1");
@@ -99,7 +99,7 @@ describe("RuntimeRegistry drop aggregation", () => {
 describe("useDropMetrics hook (B3)", () => {
   it("surfaces deadline drops reactively from a live pattern", async () => {
     let dispatch!: (e: Ev) => void;
-    let metrics = { total: 0, maxInFlight: 0, deadline: 0 };
+    let metrics = { total: 0, maxInFlight: 0, deadline: 0, late: 0 };
 
     function Probe() {
       const { ready } = useTfloContext();

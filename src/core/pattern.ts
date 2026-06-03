@@ -52,8 +52,10 @@ export interface DerivedSignal {
  * delivered across the WASM boundary as a string.
  * - `"max_in_flight"` — the bounded in-flight set overflowed (backpressure).
  * - `"deadline"` — a positive step's `within(...)` window closed unmatched.
+ * - `"late"` — an event arrived behind the reorder buffer's event-time frontier
+ *   (more than `maxLateness` out of order), so it couldn't be matched in order.
  */
-export type DropReason = "max_in_flight" | "deadline";
+export type DropReason = "max_in_flight" | "deadline" | "late";
 
 /** Fluent pattern builder. Chain steps, finalize with `.emit(...)`. */
 export class Pattern<E extends { ts: number } = { ts: number }> {
@@ -164,8 +166,13 @@ export class PatternRuntime<E extends { ts: number } = { ts: number }> {
   private readonly inner: WasmPatternRuntime;
   readonly patternName: string;
 
-  constructor(pattern: CompiledPattern<E>) {
-    this.inner = new WasmPatternRuntime(pattern.inner);
+  /**
+   * @param maxLateness — when set, enable the event-time reorder buffer: events
+   * arriving up to this many ms out of order are released to the matcher in
+   * event-time order (later ones drop as `"late"`). Omit for in-order behaviour.
+   */
+  constructor(pattern: CompiledPattern<E>, maxLateness?: number) {
+    this.inner = new WasmPatternRuntime(pattern.inner, maxLateness);
     this.patternName = pattern.name;
   }
 
