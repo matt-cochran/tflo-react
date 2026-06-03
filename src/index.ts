@@ -29,6 +29,7 @@ export {
   type FoldOpts,
 } from "./hooks/useFold";
 export { useRecorder, type Recorder, type RecorderOpts } from "./hooks/useRecorder";
+export { useCombineLatest } from "./hooks/useCombineLatest";
 
 // Pattern builder + types
 export {
