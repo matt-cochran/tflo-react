@@ -22,6 +22,12 @@ export {
 
 // Building blocks
 export { useWindow, useCount, type WindowOpts, type WindowState } from "./hooks/useWindow";
+export {
+  useFold,
+  type FoldReducer,
+  type FoldContext,
+  type FoldOpts,
+} from "./hooks/useFold";
 export { useRecorder, type Recorder, type RecorderOpts } from "./hooks/useRecorder";
 
 // Pattern builder + types
