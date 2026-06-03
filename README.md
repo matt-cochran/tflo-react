@@ -60,7 +60,11 @@ usePattern("frustrated_session", (p) =>
 
 **Cross-tier semantic parity.** The matching/windowing semantics are byte-
 identical to your `tflo` Rust backend — author a funnel/abuse/SLA pattern once,
-run it client-side for instant UX and server-side for trust.
+run it client-side for instant UX and server-side for trust. This is proven
+end-to-end in the [`tflo-parity-demo`](../tflo-parity-demo): the same serializable
+rule runs in the browser (WASM) and a native Rust server over gRPC-web, with a
+live diff lane showing **0 divergence**, server-pushed rule updates, and
+offline→reconcile.
 
 **Patterns as data — server-pushable (`@tflo/react/cel`).** Predicates can be
 **CEL strings**, not JS closures — so a pattern is a serializable object,
