@@ -76,6 +76,18 @@ export class Pattern<E extends { ts: number } = { ts: number }> {
     );
     return this;
   }
+  /**
+   * Attach an **interior-negation guard** to the NEXT positive (`then`) step:
+   * while the match skips events waiting for that step, any event satisfying
+   * `pred` kills the partial. Expresses "A then B with NO C in between" —
+   * `.when(a).notBetween(c).then(b)` — which a terminal `notThen` cannot.
+   */
+  notBetween(pred: (e: E, ctx: MatchContext<E>) => boolean): this {
+    this.inner = this.inner.notBetween((e: unknown, ctx: unknown) =>
+      pred(e as E, ctx as MatchContext<E>),
+    );
+    return this;
+  }
   notThen(pred: (e: E, ctx: MatchContext<E>) => boolean): this {
     this.inner = this.inner.notThen((e: unknown, ctx: unknown) =>
       pred(e as E, ctx as MatchContext<E>),

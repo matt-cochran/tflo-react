@@ -66,3 +66,24 @@ new TypedPattern<Events, Signals, "abandoned_cart">(raw, "abandoned_cart")
   .when((e) => e.kind === "add_to_cart")
   // @ts-expect-error payload must satisfy Signals["abandoned_cart"] = { cartId: string }
   .emit(() => ({ wrong: 1 }));
+
+// ── notBetween is a modifier on the UPCOMING step (interior-negation guard), so
+//    it leaves the step tuple unchanged and stays chainable — `ctx.first()` in
+//    the subsequent `.then` is still step 0's narrowed variant, and `m.first()`
+//    in `.emit` is unchanged. (Same `this`-returning shape as next/within/times.)
+const _afterNotBetween = new TypedPattern<Events, Signals, "abandoned_cart">(
+  raw,
+  "abandoned_cart",
+)
+  .when((e) => e.kind === "add_to_cart")
+  .notBetween((e) => e.kind === "purchase");
+expectTypeOf(_afterNotBetween).toEqualTypeOf<
+  TypedPattern<Events, Signals, "abandoned_cart", [Extract<Events, { kind: "add_to_cart" }>]>
+>();
+_afterNotBetween.then((e, ctx) => {
+  // tuple unchanged: ctx.first() is still the add_to_cart step (step 0)
+  expectTypeOf(ctx.first()).toEqualTypeOf<
+    { kind: "add_to_cart"; ts: number; cartId: string; sku: string } | undefined
+  >();
+  return e.kind === "purchase";
+});

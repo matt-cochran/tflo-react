@@ -29,6 +29,48 @@ function runFlow(flowId: string, events: Ev[]): DerivedSignal[] {
   return out;
 }
 
+// Card-testing fraud shape (interior negation): an `auth_fail`, then ANOTHER
+// `auth_fail` within the window, with NO `auth_success` in between. A terminal
+// `notThen` cannot express this — the success must be forbidden *between* the
+// two positives, not merely absent at the end. Mirrors the engine's
+// `interior_negation_card_testing_*` use-case tests.
+function cardTesting(events: Ev[]): DerivedSignal[] {
+  const compiled = new Pattern<Ev>("card_testing")
+    .timestamp((e) => e.ts)
+    .when((e) => e.kind === "auth_fail")
+    .notBetween((e) => e.kind === "auth_success")
+    .then((e) => e.kind === "auth_fail")
+    .within(60_000)
+    .emit((m) => ({ name: "card_testing", payload: { fails: m.length } }));
+  const rt = new PatternRuntime(compiled);
+  const out: DerivedSignal[] = [];
+  for (const e of events) out.push(...rt.push(e));
+  out.push(...rt.flush());
+  rt.destroy();
+  return out;
+}
+
+describe("interior negation — notBetween (A then B with no C between)", () => {
+  it("fires on two fails with no success between", () => {
+    const out = cardTesting([
+      { kind: "auth_fail", flowId: "c", ts: 0 },
+      { kind: "view_page", flowId: "c", ts: 10_000 },
+      { kind: "auth_fail", flowId: "c", ts: 20_000 }, // second fail, no success → fires
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0].payload.fails).toBe(2);
+  });
+
+  it("is suppressed by an interior success (the case notThen cannot express)", () => {
+    const out = cardTesting([
+      { kind: "auth_fail", flowId: "c", ts: 0 },
+      { kind: "auth_success", flowId: "c", ts: 10_000 }, // success between → partial killed
+      { kind: "auth_fail", flowId: "c", ts: 20_000 }, // fresh fail, nothing after it
+    ]);
+    expect(out).toHaveLength(0);
+  });
+});
+
 describe("scenario 1 — abandoned flow (event-time negation within window)", () => {
   it("emits for the flow that never completes, not the one that completes in time", () => {
     const a = runFlow("A", [

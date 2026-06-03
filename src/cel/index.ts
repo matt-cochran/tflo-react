@@ -77,6 +77,15 @@ export class CelPattern<E extends { ts: number } = { ts: number }> {
     this.inner = this.inner.notThenCel(expr);
     return this;
   }
+  /**
+   * Attach an **interior-negation guard** (CEL string) to the NEXT positive
+   * (`thenCel`) step: "A then B with NO C in between" — the serializable twin of
+   * `notBetween`. An entry guards the corresponding `then` step.
+   */
+  notBetweenCel(expr: string): this {
+    this.inner = this.inner.notBetweenCel(expr);
+    return this;
+  }
   when(pred: (e: E) => boolean): this {
     this.inner = this.inner.when((e: unknown) => pred(e as E));
     return this;
@@ -87,6 +96,14 @@ export class CelPattern<E extends { ts: number } = { ts: number }> {
   }
   notThen(pred: (e: E) => boolean): this {
     this.inner = this.inner.notThen((e: unknown) => pred(e as E));
+    return this;
+  }
+  /**
+   * JS-closure interior-negation guard for the NEXT positive (`then`) step: "A
+   * then B with NO C in between" (see `Pattern.notBetween`).
+   */
+  notBetween(pred: (e: E) => boolean): this {
+    this.inner = this.inner.notBetween((e: unknown) => pred(e as E));
     return this;
   }
   within(ms: number): this {
@@ -145,6 +162,13 @@ export interface CelPatternSpec {
   name: string;
   when: string;
   then?: string[];
+  /**
+   * Interior-negation guards, positionally aligned with `then`: a non-empty
+   * `notBetween[i]` forbids its CEL between the running match and `then[i]` ("A
+   * then B with no C in between"). An empty string (or a short array) = no guard
+   * for that step. Mirrors the Rust serde `notBetween` field.
+   */
+  notBetween?: string[];
   notThen?: string;
   /** ms bound applied to the last step. */
   within?: number;
@@ -160,7 +184,11 @@ export function compileCelPattern<E extends { ts: number } = { ts: number }>(
   emit: (m: Match<E>) => EmitOutput,
 ): CelCompiled<E> {
   let p = new CelPattern<E>(spec.name).timestamp(timestamp).whenCel(spec.when);
-  for (const t of spec.then ?? []) p = p.thenCel(t);
+  (spec.then ?? []).forEach((t, i) => {
+    const guard = spec.notBetween?.[i];
+    if (guard) p = p.notBetweenCel(guard);
+    p = p.thenCel(t);
+  });
   if (spec.notThen) p = p.notThenCel(spec.notThen);
   if (spec.within != null) p = p.within(spec.within);
   return p.emit(emit);
@@ -179,6 +207,12 @@ export interface TypedCelSpec<S extends SignalMap, K extends keyof S & string> {
   name: K;
   when: string;
   then?: string[];
+  /**
+   * Interior-negation guards, positionally aligned with `then` (see
+   * `CelPatternSpec.notBetween`): a non-empty `notBetween[i]` forbids its CEL
+   * between the running match and `then[i]`; empty string = no guard.
+   */
+  notBetween?: string[];
   notThen?: string;
   /** ms bound applied to the last step. */
   within?: number;
@@ -201,7 +235,11 @@ export function compileTypedCelPattern<
   emit: (m: Match<E>) => S[K],
 ): CelCompiled<E> {
   let p = new CelPattern<E>(spec.name).timestamp(timestamp).whenCel(spec.when);
-  for (const t of spec.then ?? []) p = p.thenCel(t);
+  (spec.then ?? []).forEach((t, i) => {
+    const guard = spec.notBetween?.[i];
+    if (guard) p = p.notBetweenCel(guard);
+    p = p.thenCel(t);
+  });
   if (spec.notThen) p = p.notThenCel(spec.notThen);
   if (spec.within != null) p = p.within(spec.within);
   return p.emit((m) => ({

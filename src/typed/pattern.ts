@@ -162,6 +162,20 @@ export class TypedPattern<
     return this as unknown as TypedPattern<E, S, K, readonly unknown[]>;
   }
 
+  /**
+   * Attach an **interior-negation guard** to the NEXT positive (`then`) step:
+   * while the match skips events waiting for that step, any event satisfying the
+   * predicate kills the partial — "A then B with NO C in between", which a
+   * terminal `notThen` cannot express. A modifier on the *upcoming* step, so the
+   * step tuple is unchanged (`this`).
+   */
+  notBetween(pred: (e: E, ctx: TypedMatchContext<Steps>) => boolean): this {
+    this.inner = this.inner.notBetween((e, c) =>
+      pred(e as E, c as unknown as TypedMatchContext<Steps>),
+    );
+    return this;
+  }
+
   notThen<T extends E>(
     pred: (e: E, ctx: TypedMatchContext<Steps>) => e is T,
   ): TypedPattern<E, S, K, [...Steps, T]>;
