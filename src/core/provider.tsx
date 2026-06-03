@@ -7,6 +7,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import type { Clock } from "./clock";
 import { EventBus } from "./eventBus";
 import { TraceStore } from "./provenance";
 import { RuntimeRegistry } from "./runtimeRegistry";
@@ -33,11 +34,11 @@ export interface TfloContextValue {
 
 const Ctx = createContext<TfloContextValue | null>(null);
 
-function makeContext(ready: boolean, trace?: boolean, autoClock?: boolean): TfloContextValue {
+function makeContext(ready: boolean, trace?: boolean, clock?: Clock): TfloContextValue {
   const signals = new SignalRegistry();
   const runtimes = new RuntimeRegistry();
   const traceStore = trace ? new TraceStore() : undefined;
-  const bus = new EventBus(runtimes, signals, traceStore, autoClock);
+  const bus = new EventBus(runtimes, signals, traceStore, clock);
   return { bus, signals, runtimes, ready, error: null, trace: traceStore };
 }
 
@@ -53,7 +54,7 @@ export function TfloProvider({
   children,
   init = initTflo,
   trace = false,
-  autoClock = false,
+  clock,
 }: {
   children: React.ReactNode;
   /** Override the engine init (test seam); defaults to the real WASM init. */
@@ -66,17 +67,18 @@ export function TfloProvider({
    */
   trace?: boolean;
   /**
-   * Opt into the self-driving clock so "A then no B within T" rules fire on
-   * absence with no event. Assumes event-time is wall-clock-ms (stamp events with
-   * real timestamps). Off by default — apps using logical timestamps drive
-   * `useTfloContext().bus.tick(now)` themselves.
+   * Inject a {@link Clock} to enable the self-driving deadlines, so "A then no B
+   * within T" fires on absence with no event. The same clock stamps omitted-`ts`
+   * events and drives the wake-ups, so they share one timeline. Pass
+   * `systemClock` for live apps, a `ManualClock` for tests / replay /
+   * time-scrubbing. Omit it and the host drives `bus.tick(now)` itself.
    */
-  autoClock?: boolean;
+  clock?: Clock;
 }) {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<unknown | null>(null);
   const ref = useRef<TfloContextValue | null>(null);
-  if (!ref.current) ref.current = makeContext(false, trace, autoClock);
+  if (!ref.current) ref.current = makeContext(false, trace, clock);
 
   useEffect(() => {
     let alive = true;

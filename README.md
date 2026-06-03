@@ -294,13 +294,21 @@ correction is just a later event the reducer applies (last-writer-wins). This is
 the read-model half of modeling business state as **cached history** rather than
 hand-mutated flags.
 
-**Self-driving deadlines.** "A then no B within T" fires on the *absence* of an
-event — no cron, no `setTimeout`-and-flag. The engine exposes a pure `tick(now)`;
-the host drives it. Opt into the browser driver with `<Provider autoClock>` (one
-coalesced timer at the earliest deadline; assumes event-time is wall-clock-ms),
-or drive `useTfloContext().bus.tick(now)` yourself (e.g. from a virtual clock).
-The engine reads no wall clock, so a tick-driven run stays byte-identical across
-replay and across tiers.
+**Self-driving deadlines (inject a clock).** "A then no B within T" fires on the
+*absence* of an event — no cron, no `setTimeout`-and-flag. The engine exposes a
+pure `tick(now)`; you **inject the clock** that drives it (the RxJS-`Scheduler`
+shape — `now()` + `schedule()`):
+
+```tsx
+import { systemClock, ManualClock } from "@tflo/react";
+<Provider clock={systemClock}>   // live: wall-clock + setTimeout
+<Provider clock={new ManualClock()}>  // virtual: advance() it — tests, replay, scrubbing
+```
+
+The *same* injected clock stamps omitted-`ts` events and schedules the wake-ups,
+so event-time and deadline-time can never diverge. Omit the prop and the host
+drives `useTfloContext().bus.tick(now)` itself. The engine reads no wall clock, so
+a tick-driven run is byte-identical across replay and across tiers.
 
 > Scope, honestly: `tick` advances *in-order* event-time. Out-of-order / late-
 > arrival reordering (watermarks), cross-entity write-time invariants, and durable

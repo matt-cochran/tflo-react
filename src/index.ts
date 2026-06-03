@@ -5,6 +5,11 @@
 // Provider + scope
 export { TfloProvider, TfloScope, useTfloContext, type TfloContextValue } from "./core/provider";
 
+// Injected time source for the self-driving deadlines. Same clock stamps events
+// and drives wake-ups, so they share one timeline. systemClock = live wall-clock;
+// ManualClock = virtual time the consumer advances (tests / replay / scrubbing).
+export { systemClock, ManualClock, type Clock } from "./core/clock";
+
 // Core primitives
 export { useEmit } from "./hooks/useEmit";
 export { usePattern, type UsePatternOpts } from "./hooks/usePattern";

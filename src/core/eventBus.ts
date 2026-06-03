@@ -17,6 +17,7 @@
  * after `open()`. The queue is capped (see `MAX_BUFFER`) to avoid unbounded
  * growth; events past the cap are dropped (oldest first) and counted.
  */
+import type { Clock } from "./clock";
 import type { DerivedSignal } from "./pattern";
 import type { CauseRef, TraceStore } from "./provenance";
 import type { RuntimeRegistry } from "./runtimeRegistry";
@@ -44,13 +45,8 @@ export class EventBus {
   private buffer: Event[] | null = [];
   /** Number of pre-ready events dropped because the buffer cap was hit. */
   droppedCount = 0;
-  /**
-   * Self-driving clock: a single coalesced timer armed at the earliest pending
-   * deadline across all runtimes. This is the *host* driver — it reads the page
-   * clock and calls the engine's pure `tick`; the engine never reads a clock, so
-   * replay/parity hold. `null` when no deadline is pending.
-   */
-  private clockTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Cancels the pending self-driving deadline wake-up (`null` when none armed). */
+  private cancelClock: (() => void) | null = null;
 
   constructor(
     private readonly runtimes: RuntimeRegistry,
@@ -58,18 +54,24 @@ export class EventBus {
     /** Opt-in provenance recorder; when set, raw events + signal causes are logged. */
     private readonly trace?: TraceStore,
     /**
-     * Opt into the self-driving clock: when `true`, the bus arms a coalesced
-     * timer at the earliest pending deadline and `tick`s the engine when it
-     * fires, so "A then no B within T" fires on absence with no event.
+     * Injected time source. When provided, the bus self-drives: it stamps
+     * omitted-`ts` events with `clock.now()` AND arms a single coalesced wake-up
+     * (`clock.schedule`) at the earliest pending deadline, so "A then no B within
+     * T" fires on absence with no event. Because the *same* clock stamps and
+     * drives, event-time and deadline-time can never diverge.
      *
-     * **Assumes event-time is wall-clock-ms** (the default `useEmit` stamp). Apps
-     * using explicit logical timestamps leave this off (the default) and drive
-     * {@link tick} themselves — otherwise wall-clock wake-ups would advance the
-     * engine past logical deadlines. Off by default preserves event-time
-     * semantics for existing apps.
+     * Inject {@link systemClock} for live wall-clock apps, a {@link ManualClock}
+     * for tests / replay / time-scrubbing. Omit it and the bus does not
+     * self-drive — the host calls {@link tick} itself and omitted-`ts` events use
+     * `performance.now()`.
      */
-    private readonly autoClock = false,
+    private readonly clock?: Clock,
   ) {}
+
+  /** Time source for stamping + scheduling: the injected clock, else wall-clock. */
+  private nowMs(): number {
+    return this.clock ? this.clock.now() : now();
+  }
 
   /** True while events are being queued (engine not yet ready). */
   get buffering(): boolean {
@@ -109,7 +111,7 @@ export class EventBus {
 
   dispatch(event: Record<string, unknown> & { kind?: string; ts?: number }, depth = 0): void {
     const ev: Event =
-      typeof event.ts === "number" ? (event as Event) : { ...event, ts: now() };
+      typeof event.ts === "number" ? (event as Event) : { ...event, ts: this.nowMs() };
 
     if (this.buffer !== null) {
       // Engine not ready yet — queue in order, preserving ts. Feedback re-entry
@@ -130,9 +132,9 @@ export class EventBus {
   /**
    * Advance logical time to `now` WITHOUT an event, firing any deadline-reached
    * derived matches (the self-driving "A then no B within T" case) through the
-   * same publish + feedback + trace path as a real event. Idempotent. Exposed so
-   * tests/demos can drive virtual time; the bus's own clock driver calls it at
-   * each pending deadline using the page clock.
+   * same publish + feedback + trace path as a real event. Idempotent. The
+   * injected clock calls this at each pending deadline; it's also public so a
+   * host with no injected clock can drive time itself.
    */
   tick(nowMs: number): void {
     if (this.buffer !== null) return; // not ready yet; deadlines fire after open()
@@ -141,12 +143,10 @@ export class EventBus {
     this.scheduleClock();
   }
 
-  /** Clear the pending clock timer (call on provider unmount to avoid leaks). */
+  /** Cancel the pending deadline wake-up (call on provider unmount to avoid leaks). */
   dispose(): void {
-    if (this.clockTimer !== null) {
-      clearTimeout(this.clockTimer);
-      this.clockTimer = null;
-    }
+    this.cancelClock?.();
+    this.cancelClock = null;
   }
 
   /** Synchronous delivery path: taps → runtimes → signals → feedback. */
@@ -183,25 +183,21 @@ export class EventBus {
   }
 
   /**
-   * (Re)arm the single coalesced clock timer at the earliest pending deadline.
-   * Reads the page clock (host-side); the engine stays clock-free. Assumes
-   * event-time is the same timeline the bus stamps omitted-`ts` events with
-   * (`performance.now()`); callers using explicit non-wall-clock timestamps drive
-   * {@link tick} themselves.
+   * (Re)arm the single coalesced deadline wake-up via the INJECTED clock, at the
+   * earliest pending deadline. The clock both stamps events and schedules the
+   * wake-up, so event-time and deadline-time share one timeline and can't
+   * diverge. No injected clock → no self-driving (the host drives `tick`).
    */
   private scheduleClock(): void {
-    if (!this.autoClock) return; // opt-in; otherwise the host drives tick()
-    if (typeof setTimeout === "undefined") return; // SSR / no timers
-    if (this.clockTimer !== null) {
-      clearTimeout(this.clockTimer);
-      this.clockTimer = null;
-    }
+    if (!this.clock) return; // no injected clock → host drives tick() itself
+    this.cancelClock?.();
+    this.cancelClock = null;
     const deadline = this.runtimes.nextDeadline();
     if (deadline === undefined) return;
-    const delay = Math.max(0, deadline - now());
-    this.clockTimer = setTimeout(() => {
-      this.clockTimer = null;
-      this.tick(now());
-    }, delay);
+    const clock = this.clock;
+    this.cancelClock = clock.schedule(deadline, () => {
+      this.cancelClock = null;
+      this.tick(clock.now());
+    });
   }
 }
