@@ -287,6 +287,26 @@ usePattern("abandoned", abandoned, [], { partitionBy: (e) => e.flowId });
 `useCount(kind, { ms })`, `useJoin(left, right, { key, ts?, window })`,
 `useRecorder({ maxEvents })` → `{ events, replay, clear }`.
 
+**Derived state, not stored state.** `useProjection(key, reducer, opts)` folds the
+event stream (raw + derived) into a queryable *current state per entity* —
+`status = fold(history)`, no status field, no flags. Incremental and bounded; a
+correction is just a later event the reducer applies (last-writer-wins). This is
+the read-model half of modeling business state as **cached history** rather than
+hand-mutated flags.
+
+**Self-driving deadlines.** "A then no B within T" fires on the *absence* of an
+event — no cron, no `setTimeout`-and-flag. The engine exposes a pure `tick(now)`;
+the host drives it. Opt into the browser driver with `<Provider autoClock>` (one
+coalesced timer at the earliest deadline; assumes event-time is wall-clock-ms),
+or drive `useTfloContext().bus.tick(now)` yourself (e.g. from a virtual clock).
+The engine reads no wall clock, so a tick-driven run stays byte-identical across
+replay and across tiers.
+
+> Scope, honestly: `tick` advances *in-order* event-time. Out-of-order / late-
+> arrival reordering (watermarks), cross-entity write-time invariants, and durable
+> projection/timer backends are deliberate non-goals here — see the engine's
+> non-goals. The in-memory projection + opt-in clock are the lean, default path.
+
 **Provenance (opt-in):** pass `trace` to the provider (`<Provider trace>`) and the
 library records every signal's `payload.causes` + raw events into a `TraceStore`,
 exposed via `useTfloContext().trace` and the reactive **`useExplain(name)`** hook
