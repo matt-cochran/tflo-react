@@ -11,6 +11,13 @@ export interface Recorder {
   events: () => Array<{ ts: number; kind?: string } & Record<string, unknown>>;
   /** Re-dispatch every recorded event through the bus (deterministic replay). */
   replay: () => void;
+  /**
+   * State-as-of-T / roll-back: re-derive the signals as they stood at event-time
+   * `t` by replaying only the recorded events whose `ts <= t` (in recorded
+   * order). Because the engine is pure, the truncated replay is deterministic and
+   * equals "what the system believed at time `t`" — a roll-back, not a guess.
+   */
+  replayUntil: (t: number) => void;
   /** Clear the recording. */
   clear: () => void;
 }
@@ -46,6 +53,16 @@ export function useRecorder(opts: RecorderOpts = {}): Recorder {
     for (const ev of [...buf.current]) bus.dispatch(ev);
     replaying.current = false;
   }, [bus]);
+  const replayUntil = useCallback(
+    (t: number) => {
+      // Roll-back to event-time `t`: same as replay(), but truncated at `ts <= t`.
+      replaying.current = true;
+      bus.reset(); // start from fresh runtimes, then re-derive up to the cutoff
+      for (const ev of [...buf.current]) if (ev.ts <= t) bus.dispatch(ev);
+      replaying.current = false;
+    },
+    [bus],
+  );
 
-  return { events, replay, clear };
+  return { events, replay, replayUntil, clear };
 }

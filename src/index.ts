@@ -36,6 +36,29 @@ export {
 export { useRecorder, type Recorder, type RecorderOpts } from "./hooks/useRecorder";
 export { useCombineLatest } from "./hooks/useCombineLatest";
 
+// Backtest / what-if — replay one recorded event log against MULTIPLE rule specs
+// and diff the results ("what-if I'd shipped rule B instead of rule A?"). Pure &
+// deterministic: a pure CEP engine packages this latent superpower for free.
+export {
+  useBacktest,
+  runBacktest,
+  type BacktestEvent,
+  type BacktestSpec,
+  type BacktestDiff,
+  type BacktestResult,
+} from "./hooks/useBacktest";
+
+// Shadow / canary rule rollout — run a CANDIDATE temporal spec alongside the
+// ACTIVE one over the SAME live event stream, without acting on the candidate,
+// and surface a live DIVERGENCE stream. Reuses the backtest parity/diff
+// mechanism, but live — the safe way to canary a rule change.
+export {
+  useShadowSpec,
+  type ShadowSpec,
+  type ShadowDivergence,
+  type ShadowState,
+} from "./hooks/useShadowSpec";
+
 // Derived state, not stored state — queryable current state per entity, folded
 // from the event stream (raw + derived). Replaces hand-maintained status flags.
 export {
