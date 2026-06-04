@@ -10,19 +10,21 @@ first-class primitive for **event-time** complex-event-processing. The incumbent
 libraries cannot express it without you hand-building a stream engine.*
 
 We test this by taking three representative event-time behaviors and genuinely
-attempting each in **RxJS** and **XState** (best-effort, by agents instructed to
-act as expert *proponents* of each library — not to strawman them), then
+attempting each the **default React** way (plain effect/reducer), with **Signals**
+(`@preact/signals-core`), with **RxJS**, and with **XState** (best-effort, by agents
+instructed to act as expert *proponents* of each — not to strawman them), then
 comparing against **tflo**, which implements them natively.
 
 ## How to run
 
 ```bash
 cd validation
-npm install          # rxjs + xstate (dev-only; never shipped)
-npm run all          # runs all 7 reproductions and prints their output
+npm install          # rxjs + xstate + @preact/signals-core (dev-only; never shipped)
+npm run all          # runs all 16 reproductions and prints their output
 ```
 
-All programs ran clean during authoring (rxjs 7.8.2, xstate 5.32.0, Node ≥18).
+All programs ran clean during authoring (rxjs 7.8.2, xstate 5.32.0,
+@preact/signals-core 1.14.2, Node ≥18).
 
 ## The three scenarios
 
@@ -40,15 +42,25 @@ temporal correctness; it was hand-written.
 
 | Scenario | Library | Verdict | Event-time correctness | Core LOC | Ran? |
 |---|---|---|---|---|---|
+| 1 Abandoned flow | React (effect/reducer) | Correct only by hand-rolling the event-time window | manual (framework contributes none) | ~12 (hand-rolled) | ✅ self-asserts |
+| 1 Abandoned flow | Signals (@preact/signals-core) | Reactivity over the result; temporal logic still hand-written | manual (signals contribute none) | ~14 (hand-rolled) | ✅ self-asserts |
 | 1 Abandoned flow | RxJS | Achievable with heavy custom code | only-with-manual-bookkeeping | ~14 (correct) / engine ~30–50 (unbounded) | ✅ |
 | 1 Abandoned flow | XState | Achievable with heavy custom code | only-with-manual-bookkeeping | ~36 | ✅ |
 | 1 Abandoned flow | **tflo** | **Implemented + tested (WASM today)** | **native** | builder: 5 calls | ✅ 10 tests |
+| 2 Temporal join | React (effect/reducer) | Keyed buffer + window check hand-rolled; no eviction/late-data | manual | ~12 | ✅ self-asserts |
+| 2 Temporal join | Signals (@preact/signals-core) | Same hand-rolled join inside a computed | manual | ~14 | ✅ self-asserts |
 | 2 Temporal join | RxJS | Achievable with heavy custom code | only-with-manual-bookkeeping | ~15 (no watermark/TTL) | ✅ |
 | 2 Temporal join | XState | Achievable with heavy custom code | only-with-manual-bookkeeping | ~70 | ✅ |
 | 2 Temporal join | **tflo** | **Implemented + WASM-bound** | **native** | bridge: 1 call | ✅ engine + bridge tests |
+| 3 Out-of-order windows | React (effect/reducer) | Hand-built watermark/bucket/lateness engine | manual | ~24 (an engine) | ✅ self-asserts |
+| 3 Out-of-order windows | Signals (@preact/signals-core) | Same watermark engine inside a computed | manual | ~26 (an engine) | ✅ self-asserts |
 | 3 Out-of-order windows | RxJS | Achievable only by building an engine | only-with-manual-bookkeeping | ~20 (watermark) | ✅ |
 | 3 Out-of-order windows | XState | **Not achievable without building an engine** | only-with-manual-bookkeeping | ~10 (FSM inert) | ✅ |
 | 3 Out-of-order windows | **tflo** | **Implemented + WASM-bound** | **native** | `tumbling_window` (1 call) | ✅ engine + bridge + JS demo |
+
+React and Signals are included to show the *default* React paths: both reach the correct
+output, but every line of event-time correctness is hand-written — the framework/reactivity
+layer contributes none. Only tflo expresses the rule declaratively.
 
 ### What each reproduction demonstrated
 
