@@ -1,6 +1,6 @@
 {
   "name": "@tflo/react",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Temporal state for React — event-time complex-event-processing (the tflo WASM engine) surfaced as hooks. The missing primitive for time and event sequences.",
   "type": "module",
   "main": "./dist/index.js",
@@ -30,7 +30,6 @@
   },
   "files": [
     "dist",
-    "wasm",
     "README.md",
     "LICENSE-MIT",
     "LICENSE-APACHE"
@@ -39,7 +38,7 @@
   "scripts": {
     "build:wasm": "bash scripts/build-wasm.sh",
     "check:size": "node scripts/check-wasm-size.mjs",
-    "build:ts": "tsc -p tsconfig.json && rm -rf dist/wasm && cp -r src/wasm dist/wasm",
+    "build:ts": "tsc -p tsconfig.json && bash scripts/copy-wasm.sh",
     "build": "npm run build:wasm && npm run build:ts",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -89,7 +88,14 @@
     "type": "git",
     "url": "https://github.com/matt-cochran/tflo-react"
   },
+  "bugs": {
+    "url": "https://github.com/matt-cochran/tflo-react/issues"
+  },
+  "homepage": "https://github.com/matt-cochran/tflo-react#readme",
   "engines": {
     "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
