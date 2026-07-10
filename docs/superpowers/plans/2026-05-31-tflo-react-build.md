@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Ship `@tflo/react` — temporal-state hooks over the tflo WASM CEP engine — with every claim backed by a runnable three-way demo (RxJS vs XState vs tflo), a full set of reusable hooks/primitives, and two READMEs (product + validation).
+**Goal:** Ship `tflo-react` — temporal-state hooks over the tflo WASM CEP engine — with every claim backed by a runnable three-way demo (RxJS vs XState vs tflo), a full set of reusable hooks/primitives, and two READMEs (product + validation).
 
 **Architecture:** Thin React binding (approach A: central runtime bus) on the portable tflo WASM engine. `useSyncExternalStore` subscription substrate. Engine-only — no dependency on `@tflo/browser-events`. Validation suite stays in-repo, excluded from the npm package.
 

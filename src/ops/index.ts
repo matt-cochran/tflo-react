@@ -1,9 +1,9 @@
 /**
- * `@tflo/react/ops` — event-time stream operators (windows, keyed joins) and
+ * `tflo-react/ops` — event-time stream operators (windows, keyed joins) and
  * the streaming technical-analysis catalog (SMA/EMA/RSI/Bollinger/MACD/cross).
  *
  * Opt-in: importing this entry pulls the `ops` wasm module (~120 KB gzip), kept
- * out of the lean main `@tflo/react` entry. The module loads lazily — the
+ * out of the lean main `tflo-react` entry. The module loads lazily — the
  * `useJoin` hook (and `useOpsReady`) trigger it; the synchronous facades
  * (`windowJoinKeyed`, `tumblingWindow`, `indicators.*`) require ops to be
  * initialized first, so gate component-render facade calls on `useOpsReady()`

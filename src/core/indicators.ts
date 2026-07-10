@@ -4,9 +4,9 @@
  * MACD, threshold crossings). These run the same Rust engine used server-side.
  * Batch (whole-array) helpers; for live streams compose them with `useWindow`
  * or feed via `useEmit`. Math-only: CEL rule evaluation lives in
- * `@tflo/react/cel` (it needs the heavier CEL-enabled wasm).
+ * `tflo-react/cel` (it needs the heavier CEL-enabled wasm).
  *
- * Reachable via the `@tflo/react/ops` entry, which lazily loads the ops wasm.
+ * Reachable via the `tflo-react/ops` entry, which lazily loads the ops wasm.
  */
 import {
   compute_sma,

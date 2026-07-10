@@ -1,7 +1,7 @@
 # Validation — proving the claims
 
 This directory is **evidence**, not product. It is intentionally excluded from
-the published `@tflo/react` npm package (see the `files` allowlist in the root
+the published `tflo-react` npm package (see the `files` allowlist in the root
 `package.json`). It exists so every claim in the main README is backed by a
 runnable reproduction that anyone can re-run.
 
@@ -133,7 +133,7 @@ both have since been **addressed in the engine + WASM wrapper**:
      out-of-order claim holds exactly: the late `ts=1000` (arriving after
      `ts=3000`) lands in `[0,2000)`.
    Both are verified by native bridge tests, clean `wasm32-unknown-unknown`
-   builds, the `@tflo/react` TypeScript suite (16 tests green), and the
+   builds, the `tflo-react` TypeScript suite (16 tests green), and the
    `scenario-*/tflo.mjs` demos in this folder. Broader `tflo-ops` surface
    remains future work.
 

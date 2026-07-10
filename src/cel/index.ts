@@ -1,8 +1,8 @@
 /**
- * `@tflo/react/cel` — CEL-string predicate patterns.
+ * `tflo-react/cel` — CEL-string predicate patterns.
  *
  * **Opt-in and heavy** (~2 MB: it bundles a CEL interpreter). The main
- * `@tflo/react` package stays lean (~40 KB) and uses JS-closure predicates;
+ * `tflo-react` package stays lean (~40 KB) and uses JS-closure predicates;
  * import from here only when you need predicates as **serializable data**.
  *
  * Why it matters: a CEL predicate is a string, not code, evaluated by the same
@@ -286,7 +286,7 @@ export function compileTypedCelPattern<
 
 // ── CEL rule evaluation (rules-as-data) ─────────────────────────────────────
 // Moved here from the main entry: evaluate_rules lives in the CEL-enabled ops
-// wasm (`ops-cel`), so it belongs behind the opt-in `@tflo/react/cel` entry
+// wasm (`ops-cel`), so it belongs behind the opt-in `tflo-react/cel` entry
 // rather than bloating the lean core.
 
 const opsCel = makeLazyInit(initOpsCel as never, "../wasm/ops-cel/tflo_wasm_bg.wasm");

@@ -4,8 +4,8 @@
  * Lean-by-default: the provider only initializes the small `cep` core
  * (~17 KB gzip) at boot. The heavier `ops` module (windows/joins/indicators,
  * ~120 KB gzip) loads ONLY when an ops feature is first used — via the
- * `@tflo/react/ops` entry / `initTfloOps()`. The CEL modules load only via
- * `@tflo/react/cel`. Each module has its own in-flight promise so concurrent
+ * `tflo-react/ops` entry / `initTfloOps()`. The CEL modules load only via
+ * `tflo-react/cel`. Each module has its own in-flight promise so concurrent
  * callers share one load and unused modules are never fetched.
  *
  * SSR-safe: nothing touches `window` or a `.wasm` binary at import time — only
@@ -59,7 +59,7 @@ export function initTflo(): Promise<void> {
 
 /**
  * Initialize the `ops` module (windows / joins / indicators). Lazy: only the
- * `@tflo/react/ops` entry and its hooks call this, so apps that never touch
+ * `tflo-react/ops` entry and its hooks call this, so apps that never touch
  * ops never fetch its ~120 KB gzip binary.
  */
 export function initTfloOps(): Promise<void> {

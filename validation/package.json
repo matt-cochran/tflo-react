@@ -2,7 +2,7 @@
   "name": "tflo-react-validation",
   "private": true,
   "type": "module",
-  "description": "Reproduction suite proving the claims in the main README. NOT part of the published @tflo/react package. Run as CI evidence: can the incumbent JS libraries (RxJS, XState) express event-time CEP without hand-building an engine?",
+  "description": "Reproduction suite proving the claims in the main README. NOT part of the published tflo-react package. Run as CI evidence: can the incumbent JS libraries (RxJS, XState) express event-time CEP without hand-building an engine?",
   "scripts": {
     "s1:react": "node scenario-1-abandoned-flow/react.mjs",
     "s1:signals": "node scenario-1-abandoned-flow/signals.mjs",

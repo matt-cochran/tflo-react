@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans. Steps use `- [ ]` checkboxes.
 
-**Goal:** Give `@tflo/react` a strongly-typed public API (generic event + signal schemas threaded through every hook), so a large codebase can wire up temporal behavior with full type safety and **without CEL** — while the WASM engine stays "soft" (`unknown`) internally. Then close the remaining adoption gaps (typed layering, first-class provenance, CEL safety, integration/SSR, CEP maturity).
+**Goal:** Give `tflo-react` a strongly-typed public API (generic event + signal schemas threaded through every hook), so a large codebase can wire up temporal behavior with full type safety and **without CEL** — while the WASM engine stays "soft" (`unknown`) internally. Then close the remaining adoption gaps (typed layering, first-class provenance, CEL safety, integration/SSR, CEP maturity).
 
 **Architecture:** A **typed facade over a soft engine.** The current untyped hooks (`usePattern`, `useEmit`, …) remain the runtime core. A new `createTflo<E, S>()` factory returns *bound, generically-typed* wrappers that cast at the boundary (`(e: unknown) => pred(e as E)`) — no runtime/engine change. `E` = a discriminated-union event type; `S` = a `{ signalName: payloadType }` map. The wrapper makes signal names `keyof S`, infers `.emit` payloads from `S[name]`, and adds typed `.whenSignal/.thenSignal/.notThenSignal` for type-safe layering.
 
@@ -32,7 +32,7 @@ export interface TfloApi<E extends TfloEvent, S extends SignalMap> {
   useJoin: <L extends E, R extends E>(left: L[], right: R[], cfg: KeyedJoinConfig) => JoinedPair<L, R>[];
   useRecorder: (opts?: RecorderOpts) => Recorder<E>;
   useTfloContext: () => TfloContextValue;
-  // dynamic/escape hatch — the existing untyped hooks remain importable from "@tflo/react"
+  // dynamic/escape hatch — the existing untyped hooks remain importable from "tflo-react"
 }
 
 export type TfloEvent = { kind: string; ts: number };
@@ -105,7 +105,7 @@ export class TypedPattern<E extends TfloEvent, S extends SignalMap, Captured = E
 
 **Files:** Create `src/typed/createTflo.tsx`; Test `tests/typed/createTflo.test.tsx` + `.test-d.ts`
 
-- [ ] **Step 1: Runtime test (RTL + `@tflo/react/testing`)** — `const t = createTflo<Events, Signals>()`; render `t.Provider` + a probe that `t.useEmit()`s an `add_to_cart` then (after `settle`) `t.useSignal("abandoned_cart")` reflects the abandoned signal. Assert payload `cartId`.
+- [ ] **Step 1: Runtime test (RTL + `tflo-react/testing`)** — `const t = createTflo<Events, Signals>()`; render `t.Provider` + a probe that `t.useEmit()`s an `add_to_cart` then (after `settle`) `t.useSignal("abandoned_cart")` reflects the abandoned signal. Assert payload `cartId`.
 - [ ] **Step 2: Type tests (`.test-d.ts`)**:
   - `t.useEmit()` is `(e: Events) => void`; `dispatch({ kind: "add_to_cart", ts, cartId })` errors (missing `sku`).
   - `t.usePattern("not_a_signal", …)` errors (name not in `keyof Signals`).

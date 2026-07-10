@@ -1,4 +1,4 @@
-# @tflo/react
+# tflo-react
 
 **Temporal state for React.** The missing primitive for *time* and *event
 sequences* — event-time complex-event-processing, powered by the
@@ -66,14 +66,14 @@ rule runs in the browser (WASM) and a native Rust server over gRPC-web, with a
 live diff lane showing **0 divergence**, server-pushed rule updates, and
 offline→reconcile.
 
-**Patterns as data — server-pushable (`@tflo/react/cel`).** Predicates can be
+**Patterns as data — server-pushable (`tflo-react/cel`).** Predicates can be
 **CEL strings**, not JS closures — so a pattern is a serializable object,
 evaluated by the same `cel-interpreter` that runs in the Rust backend. Author it
 once, store it, **push it from a server at runtime**, and get byte-identical
 *predicate* parity across tiers:
 
 ```ts
-import { compileCelPattern, CelRuntime, initTfloCel } from "@tflo/react/cel";
+import { compileCelPattern, CelRuntime, initTfloCel } from "tflo-react/cel";
 await initTfloCel();
 const spec = { name: "abandoned", when: 'kind == "add_to_cart"',
                notThen: 'kind == "purchase"', within: 300000 }; // ← pure data
@@ -82,7 +82,7 @@ const rt = new CelRuntime(compileCelPattern(spec, (e) => e.ts,
 ```
 
 > Opt-in and **heavy** (~2 MB — it bundles a CEL interpreter). The default
-> `@tflo/react` stays lean (~40 KB) with JS-closure predicates; reach for `/cel`
+> `tflo-react` stays lean (~40 KB) with JS-closure predicates; reach for `/cel`
 > only when you need predicates as serializable/server-pushable data.
 
 **Deterministic replay.** `useRecorder()` records the event stream; `replay()`
@@ -92,11 +92,11 @@ time-travel debugging.
 ## Quickstart
 
 ```bash
-npm install @tflo/react react react-dom
+npm install tflo-react react react-dom
 ```
 
 ```tsx
-import { TfloProvider, useEmit, usePattern, useSignal } from "@tflo/react";
+import { TfloProvider, useEmit, usePattern, useSignal } from "tflo-react";
 
 function App() {
   return (
@@ -142,7 +142,7 @@ The WASM engine stays "soft" internally — `createTflo` is a strict typed facad
 that casts at the boundary, so there is no runtime cost and no engine change.
 
 ```tsx
-import { createTflo, type TfloEvent } from "@tflo/react";
+import { createTflo, type TfloEvent } from "tflo-react";
 
 // 1. Declare your schema once (module scope).
 type Events =
@@ -300,7 +300,7 @@ pure `tick(now)`; you **inject the clock** that drives it (the RxJS-`Scheduler`
 shape — `now()` + `schedule()`):
 
 ```tsx
-import { systemClock, ManualClock } from "@tflo/react";
+import { systemClock, ManualClock } from "tflo-react";
 <Provider clock={systemClock}>   // live: wall-clock + setTimeout
 <Provider clock={new ManualClock()}>  // virtual: advance() it — tests, replay, scrubbing
 ```
@@ -380,13 +380,13 @@ second `MatchContext` arg (`(e, ctx) => …`) for cross-step correlation.
 
 ## Testing
 
-`@tflo/react/testing` gives consumers a deterministic surface so tests never
+`tflo-react/testing` gives consumers a deterministic surface so tests never
 hand-roll registration gating (`waitFor(() => runtimes.size() > 0)`). It is
 built on `@testing-library/react` (a test-only optional peer — never pulled into
 the main bundle).
 
 ```tsx
-import { renderWithTflo, dispatchAndSettle, TestClock } from "@tflo/react/testing";
+import { renderWithTflo, dispatchAndSettle, TestClock } from "tflo-react/testing";
 
 it("derives rage from clicks", async () => {
   let dispatch!: (e: Ev) => void;
@@ -445,7 +445,7 @@ npm --prefix validation run all   # RxJS vs XState vs tflo, side by side
   and **`MatchContext`** (in the engine) for cross-step *value* correlation:
   `then`/`notThen` predicates receive a 2nd argument with the events captured so
   far, so `(e, ctx) => e.id === ctx.first()?.id` works in a single runtime.
-- **CEL predicates (shipped, opt-in):** `@tflo/react/cel` — serializable,
+- **CEL predicates (shipped, opt-in):** `tflo-react/cel` — serializable,
   server-pushable predicates with cross-tier *predicate* parity (~2 MB; v1 is
   event-field predicates, no cross-step CEL context yet).
 - **Roadmap:** cross-step CEL context (CEL predicates that reference earlier
