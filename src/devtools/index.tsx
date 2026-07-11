@@ -1,5 +1,5 @@
 /**
- * @tflo/react/devtools — a dev-only panel for "why did (didn't) my pattern
+ * tflo-react/devtools — a dev-only panel for "why did (didn't) my pattern
  * fire?". Shows live derived signals, the count of registered pattern runtimes,
  * the recorded event count, and a deterministic-replay button. Because the
  * engine is deterministic, replaying re-derives the exact same signals.

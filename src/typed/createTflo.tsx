@@ -5,7 +5,7 @@
  * `E` is a discriminated-union event type; `S` is a `{ signalName: payload }`
  * map. Every hook is re-typed in terms of `E`/`S`; the runtime is unchanged
  * (the wrappers cast at the boundary). The untyped hooks remain importable from
- * `@tflo/react` for dynamic / CEL use.
+ * `tflo-react` for dynamic / CEL use.
  *
  * This is the RECOMMENDED entry point. Call it ONCE per app (module scope) with
  * your schema, then use the returned `Provider` + hooks everywhere.
@@ -53,7 +53,7 @@ export interface TfloApi<E extends TfloEvent, S extends SignalMap> {
     opts?: core.ProjectionOpts,
   ) => core.Projection<K, St>;
   // Note: keyed event-time joins (`useJoin`) and the indicator catalog live in
-  // the opt-in `@tflo/react/ops` entry, so the typed root API stays lean.
+  // the opt-in `tflo-react/ops` entry, so the typed root API stays lean.
 }
 
 export function createTflo<E extends TfloEvent, S extends SignalMap>(): TfloApi<E, S> {

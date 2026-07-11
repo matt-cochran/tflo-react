@@ -1,5 +1,5 @@
 /**
- * Schema types for the strongly-typed `@tflo/react` facade (`createTflo<E, S>`).
+ * Schema types for the strongly-typed `tflo-react` facade (`createTflo<E, S>`).
  *
  * These are the contracts a consumer supplies to get full type safety:
  *  - `E` — a discriminated-union event type (each member has a `kind` + `ts`).

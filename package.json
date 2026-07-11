@@ -1,5 +1,5 @@
 {
-  "name": "@tflo/react",
+  "name": "tflo-react",
   "version": "0.1.0",
   "description": "Temporal state for React — event-time complex-event-processing (the tflo WASM engine) surfaced as hooks. The missing primitive for time and event sequences.",
   "type": "module",
@@ -53,7 +53,7 @@
   },
   "peerDependenciesMeta": {
     "@testing-library/react": {
-      "comment": "Only needed when importing the test-only `@tflo/react/testing` entry; never pulled into the main bundle.",
+      "comment": "Only needed when importing the test-only `tflo-react/testing` entry; never pulled into the main bundle.",
       "optional": true
     }
   },

@@ -1,5 +1,5 @@
 /**
- * `@tflo/react/testing` — a deterministic testing surface so consumers never
+ * `tflo-react/testing` — a deterministic testing surface so consumers never
  * hand-roll registration gating (`waitFor(() => runtimes.size() > 0)`).
  *
  * The engine initializes asynchronously and patterns register in effects, so a
@@ -10,7 +10,7 @@
  * resulting signals.
  *
  * `@testing-library/react` is a test-only peer/dev dependency of this entry —
- * it is never pulled into the main `@tflo/react` bundle.
+ * it is never pulled into the main `tflo-react` bundle.
  */
 import * as React from "react";
 import { act, render, type RenderOptions, type RenderResult } from "@testing-library/react";

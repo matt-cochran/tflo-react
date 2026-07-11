@@ -26,7 +26,7 @@ function rage3(p: Pattern<Ev>) {
     .emit(() => ({ name: "rage", payload: {} }));
 }
 
-describe("@tflo/react/testing — deterministic consumer surface", () => {
+describe("tflo-react/testing — deterministic consumer surface", () => {
   // ACCEPTANCE 1: a component dispatches in its MOUNT EFFECT (no manual
   // waitFor / registration gating); using ONLY `settle()` we deterministically
   // observe the resulting signal. The clock is deterministic too.

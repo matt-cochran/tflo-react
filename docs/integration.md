@@ -1,26 +1,26 @@
 # Integration, bundling & SSR
 
-How to wire `@tflo/react` into a real app: the WASM-asset story per bundler, the
+How to wire `tflo-react` into a real app: the WASM-asset story per bundler, the
 `"use client"` / SSR boundary, lazy-loading the heavy entries, and the peer
 dependencies. For the runtime lifecycle (buffer-until-ready, init-failure,
 StrictMode), see the **Lifecycle / SSR** section of the README.
 
 ## Peer dependencies
 
-`@tflo/react` declares peers rather than bundling them, so your app's single copy
+`tflo-react` declares peers rather than bundling them, so your app's single copy
 of React is the one used:
 
 ```jsonc
 "peerDependencies": {
   "react": ">=18",
   "react-dom": ">=18",
-  "@testing-library/react": ">=16"  // ONLY needed if you import "@tflo/react/testing"
+  "@testing-library/react": ">=16"  // ONLY needed if you import "tflo-react/testing"
 }
 ```
 
 - `react` / `react-dom` **>= 18** — the hooks use `useSyncExternalStore` and
   `useId`, both React 18+.
-- `@testing-library/react` is a peer **only** for the `@tflo/react/testing`
+- `@testing-library/react` is a peer **only** for the `tflo-react/testing`
   entry. It is never imported by the main package, so production bundles never
   pull it in. If you don't use the testing helpers, you can ignore it.
 
@@ -32,9 +32,9 @@ effect — never at import time:
 
 | Entry | Module | Size (uncompressed) | When |
 | --- | --- | --- | --- |
-| `@tflo/react` (default) | `cep` | ~44 KB | always (pattern matching) |
-| `@tflo/react` (default) | `ops` | ~2.5 MB | always (windows/joins/indicators) |
-| `@tflo/react/cel` | `cep-cel` | ~2.1 MB | only if you import the CEL entry |
+| `tflo-react` (default) | `cep` | ~44 KB | always (pattern matching) |
+| `tflo-react` (default) | `ops` | ~2.5 MB | always (windows/joins/indicators) |
+| `tflo-react/cel` | `cep-cel` | ~2.1 MB | only if you import the CEL entry |
 
 The `--target web` glue `fetch()`es the `.wasm` by URL relative to the JS module.
 Bundlers that understand `new URL("….wasm", import.meta.url)` (Vite, webpack 5,
@@ -49,7 +49,7 @@ Both paths are handled inside `initTflo()`; you don't call either yourself.
 ## Vite
 
 Vite is the reference setup (the demo uses it). Three knobs matter, and only when
-you consume `@tflo/react` as a local **`file:` sibling** (a monorepo / linked
+you consume `tflo-react` as a local **`file:` sibling** (a monorepo / linked
 package); a normally-installed package from npm needs none of them.
 
 ```ts
@@ -58,7 +58,7 @@ export default defineConfig({
   plugins: [react()],
 
   // tflo-react ships prebuilt wasm + ESM; don't pre-bundle it.
-  optimizeDeps: { exclude: ["@tflo/react"] },
+  optimizeDeps: { exclude: ["tflo-react"] },
 
   server: {
     fs: {
@@ -86,7 +86,7 @@ Symptoms if you skip these (file: consumer only):
 
 ## Next.js / SSR boundary
 
-`@tflo/react` is **client-only at runtime** but **import-safe on the server**:
+`tflo-react` is **client-only at runtime** but **import-safe on the server**:
 init is deferred to a `useEffect`, so importing the package during SSR does not
 touch `window` or instantiate WASM. The only rule is the standard one — anything
 that *renders* tflo state is a client component.
@@ -104,7 +104,7 @@ that *renders* tflo state is a client component.
 
 ```tsx
 "use client";
-import { createTflo } from "@tflo/react";
+import { createTflo } from "tflo-react";
 
 const tflo = createTflo<Events, Signals>();
 
@@ -151,11 +151,11 @@ dominate the bundle. Two ways to keep them off the critical path:
    const BehaviorIsland = React.lazy(() => import("./BehaviorIsland"));
    ```
 
-2. **Keep CEL opt-in.** `@tflo/react/cel` is a separate entry for exactly this
+2. **Keep CEL opt-in.** `tflo-react/cel` is a separate entry for exactly this
    reason — import it only in the island that needs serializable/server-pushable
    CEL patterns, so the ~2 MB CEL interpreter never lands in bundles that use the
-   default JS-closure predicates. Likewise `@tflo/react/devtools` and
-   `@tflo/react/testing` are separate entries that never enter your main chunk
+   default JS-closure predicates. Likewise `tflo-react/devtools` and
+   `tflo-react/testing` are separate entries that never enter your main chunk
    unless you import them.
 
 The subpath `exports` map (`.`, `./cel`, `./devtools`, `./testing`) means a

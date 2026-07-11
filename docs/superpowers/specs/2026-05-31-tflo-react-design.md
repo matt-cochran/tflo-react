@@ -87,7 +87,7 @@ three (283 green Rust tests). Two honest corrections surfaced:
    `window_join_keyed` (new `keyed_window_join` combinator) and `tumbling_window`
    (drives `TumblingSumOp` through `KeyedGraphState` + `OutOfOrderPolicy::Buffer`
    + watermark). Verified by native bridge tests, clean `wasm32` builds, the
-   `@tflo/react` suite (16 tests green), and three runnable `tflo.mjs` demos.
+   `tflo-react` suite (16 tests green), and three runnable `tflo.mjs` demos.
    This reverses the earlier over-pessimistic "not worth it without CEL"
    framing: the local value (a real event-time CEP engine in the browser) is
    large and unmatched in JS regardless of CEL; CEL is a separate axis
@@ -354,7 +354,7 @@ const n = useCount("error", { ms: 1000 });
 **Not built:** a general `map`/`filter`/`merge`/`scan` operator algebra.
 Source transforms live in the `useEventSource` callback or `useMemo`.
 
-### Devtool (`@tflo/react/devtools`)
+### Devtool (`tflo-react/devtools`)
 
 A dev-only panel — answers "why didn't my pattern fire?", which the pressure
 test flagged as the make-or-break DX question. Scrub the recorded event
