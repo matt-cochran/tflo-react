@@ -1,0 +1,27 @@
+name: Branch flow guard
+
+# Enforces the gitflow direction: feature -> dev -> main.
+# Only `dev`, `release/*`, or `hotfix/*` may open a pull request into `main`.
+# This runs ONLY for PRs whose base is `main`, so it never blocks feature -> dev.
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  flow-guard:
+    name: flow-guard
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce feature -> dev -> main
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          echo "PR head branch: '$HEAD_REF'  ->  base: 'main'"
+          case "$HEAD_REF" in
+            dev|release/*|hotfix/*)
+              echo "OK: '$HEAD_REF' is allowed to target main." ;;
+            *)
+              echo "::error::PRs into 'main' must come from 'dev', 'release/*', or 'hotfix/*' (got '$HEAD_REF')."
+              echo "Merge your feature into 'dev' first, then open a 'dev -> main' release PR."
+              exit 1 ;;
+          esac
